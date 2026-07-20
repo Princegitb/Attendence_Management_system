@@ -150,13 +150,12 @@ export default function OverviewView({ onNavigate }) {
                     </td>
                     <td className="p-3 font-mono text-emerald-400">{rec.check_in_distance_from_post || 0}m</td>
                     <td className="p-3">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                        rec.status === 'CHECKED_OUT'
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${rec.status === 'CHECKED_OUT'
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                           : rec.status === 'CHECKED_IN'
-                          ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                      }`}>
+                            ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        }`}>
                         {rec.status}
                       </span>
                     </td>
