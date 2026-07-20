@@ -16,25 +16,55 @@ export default function LocationPickerMap({
     address: ''
   });
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const performSearch = async (searchQuery) => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
 
     setSearching(true);
-    setSearchResults([]);
 
     try {
-      // Free public geocoding API (Zero Card / Zero API Key Required)
+      // High-speed OpenStreetMap Photon geocoder (Zero Card / Zero API Key Required)
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=in`
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&limit=5`
       );
       const data = await res.json();
-      setSearchResults(data || []);
+
+      const results = (data.features || []).map((f) => {
+        const props = f.properties;
+        const nameParts = [
+          props.name,
+          props.street,
+          props.district || props.city || props.county,
+          props.state,
+          props.country
+        ].filter(Boolean);
+
+        return {
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0],
+          display_name: nameParts.join(', ')
+        };
+      });
+
+      setSearchResults(results);
     } catch (err) {
       console.error('Search error:', err);
     } finally {
       setSearching(false);
     }
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    performSearch(val);
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    performSearch(query);
   };
 
   const handleSelectResult = (item) => {
@@ -44,7 +74,7 @@ export default function LocationPickerMap({
 
     setCurrentPos({ lat, lng, address });
     setSearchResults([]);
-    setQuery(item.display_name.split(',')[0]);
+    setQuery(item.display_name);
 
     onLocationSelect({
       latitude: lat,
@@ -95,13 +125,13 @@ export default function LocationPickerMap({
         </button>
       </div>
 
-      {/* Free Search Bar */}
-      <form onSubmit={handleSearch} className="relative">
+      {/* Instant Live Search Bar */}
+      <form onSubmit={handleFormSubmit} className="relative">
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search landmark or address (e.g. DLF Cyber City, Noida Sector 62)..."
+          onChange={handleInputChange}
+          placeholder="Search landmark or city (e.g. Cyber City, Noida, Mumbai)..."
           className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-24 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
         />
         <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
@@ -115,14 +145,14 @@ export default function LocationPickerMap({
         </button>
       </form>
 
-      {/* Search Results Dropdown */}
+      {/* Live Search Results Dropdown */}
       {searchResults.length > 0 && (
-        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-700/60 max-h-48 overflow-y-auto">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-700/60 max-h-48 overflow-y-auto shadow-2xl">
           {searchResults.map((item, idx) => (
             <div
               key={idx}
               onClick={() => handleSelectResult(item)}
-              className="p-2.5 hover:bg-slate-700/50 cursor-pointer text-xs text-slate-300 transition-colors flex items-start gap-2"
+              className="p-2.5 hover:bg-slate-700/80 cursor-pointer text-xs text-slate-300 transition-colors flex items-start gap-2"
             >
               <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
               <span className="line-clamp-2">{item.display_name}</span>
@@ -135,7 +165,7 @@ export default function LocationPickerMap({
       <div className="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl space-y-2">
         {currentPos.address && (
           <p className="text-[11px] text-sky-400 font-medium flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> {currentPos.address}
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" /> {currentPos.address}
           </p>
         )}
 
