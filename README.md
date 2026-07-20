@@ -1,4 +1,4 @@
-# 🛡️ Guard Attendance Management System
+# Guard Attendance Management System
 
 A production-grade, end-to-end workforce management and attendance verification system designed specifically for security guard agencies. 
 
@@ -6,16 +6,16 @@ A production-grade, end-to-end workforce management and attendance verification 
 
 ---
 
-## 🌟 Key System Features
+## Key System Features
 
-### 📱 1. Field Officer Mobile App (Flutter)
+### 1. Field Officer Mobile App (Flutter)
 - **Zero-Guard App Dependency**: Designed for guards with basic keypad phones.
 - **Live GPS Geo-Fencing**: Acquires live device GPS coordinates with accuracy metrics.
 - **Rear-Camera Photo Proofs**: Enforces live camera capture to prevent gallery uploads or proxy attendance.
 - **Daily Guard Checklist**: Displays assigned guards categorized by *Pending*, *Checked-In*, and *Checked-Out* status.
 - **First-Login Security Enforcement**: Mandatory password change policy on first login.
 
-### 💻 2. Manager Web Dashboard (React + Vite + TailwindCSS)
+### 2. Manager Web Dashboard (React + Vite + TailwindCSS)
 - **Live Real-Time Overview**: Live counters for total guards, present count, absent/pending count, and geo-fence violation alerts.
 - **Interactive Geo-Fence Location Picker**: Fast geocoding search bar + 1-click GPS detector to set post coordinates and radius.
 - **Bulk Guard Roster Import (Excel)**: Upload 100+ guards in seconds using Excel (`.xlsx`) templates with full automated validation.
@@ -23,7 +23,7 @@ A production-grade, end-to-end workforce management and attendance verification 
 - **Manual Attendance Correction Engine**: Allows managers to correct attendance with mandatory detailed audit reasons.
 - **1-Click CSV Attendance Reports**: Download formatted attendance reports filterable by date range.
 
-### ⚡ 3. Backend API & Security (Node.js + Express + PostgreSQL)
+### 3. Backend API & Security (Node.js + Express + PostgreSQL)
 - **Zero-Trust Server Verification**: Independent server-side distance calculation using the **Haversine formula** to enforce post radiuses.
 - **PostgreSQL Database**: Relational schema supporting Guards, Field Officers, Posts, Shifts, Assignments, Attendance, and Audit Logs.
 - **Short-Lived JWT & Refresh Tokens**: Secure token rotation with bcrypt password hashing.
@@ -31,7 +31,7 @@ A production-grade, end-to-end workforce management and attendance verification 
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Domain | Technologies Used |
 | :--- | :--- |
@@ -44,7 +44,7 @@ A production-grade, end-to-end workforce management and attendance verification 
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 Attendence_Management_system/
@@ -133,6 +133,4 @@ Where $R = 6,371,000$ meters. If $d > \text{allowed\_radius\_metres}$, the check
 
 ---
 
-## 👤 Author & Maintainer
-
-Developed by **Prince Kumar** ([@Princegitb](https://github.com/Princegitb))
+Developed by **Prince Shukla** ([@Princegitb](https://github.com/Princegitb))
