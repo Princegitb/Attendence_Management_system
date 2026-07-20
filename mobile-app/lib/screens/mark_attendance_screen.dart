@@ -9,7 +9,7 @@ import '../services/location_service.dart';
 
 class MarkAttendanceScreen extends StatefulWidget {
   final GuardModel guard;
-  const MarkAttendanceScreen({Key? key, required this.guard}) : super(key: key);
+  const MarkAttendanceScreen({super.key, required this.guard});
 
   @override
   State<MarkAttendanceScreen> createState() => _MarkAttendanceScreenState();
@@ -238,9 +238,9 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                   padding: const EdgeInsets.all(14),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.15),
+                    color: Colors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.withOpacity(0.5)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     children: [
@@ -262,9 +262,9 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                   padding: const EdgeInsets.all(14),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: emeraldColor.withOpacity(0.15),
+                    color: emeraldColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: emeraldColor.withOpacity(0.5)),
+                    border: Border.all(color: emeraldColor.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     children: [

@@ -5,7 +5,7 @@ import 'mark_attendance_screen.dart';
 import 'login_screen.dart';
 
 class ChecklistScreen extends StatefulWidget {
-  const ChecklistScreen({Key? key}) : super(key: key);
+  const ChecklistScreen({super.key});
 
   @override
   State<ChecklistScreen> createState() => _ChecklistScreenState();
@@ -261,18 +261,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Widget _buildStatusBadge(String status) {
-    Color bg = Colors.amber.withOpacity(0.15);
+    Color bg = Colors.amber.withValues(alpha: 0.15);
     Color border = Colors.amber;
     Color text = Colors.amberAccent;
     String label = 'PENDING';
 
     if (status == 'CHECKED_IN') {
-      bg = const Color(0xFF0284C7).withOpacity(0.15);
+      bg = const Color(0xFF0284C7).withValues(alpha: 0.15);
       border = const Color(0xFF0284C7);
       text = const Color(0xFF38BDF8);
       label = 'CHECKED IN';
     } else if (status == 'CHECKED_OUT') {
-      bg = const Color(0xFF10B981).withOpacity(0.15);
+      bg = const Color(0xFF10B981).withValues(alpha: 0.15);
       border = const Color(0xFF10B981);
       text = const Color(0xFF34D399);
       label = 'CHECKED OUT';

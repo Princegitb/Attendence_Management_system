@@ -67,8 +67,16 @@ async function query(text, params = []) {
       const res = await pool.query(text, params);
       return res;
     } catch (error) {
-      if (error.code === 'ECONNREFUSED' || error.message.includes('connect ECONNREFUSED')) {
-        console.warn('PostgreSQL connection failed. Operating in dev mode with mock DB fallback.');
+      const isConnectionError = error.code === 'ECONNREFUSED' ||
+                                 error.code === 'ENOTFOUND' ||
+                                 error.code === 'ETIMEDOUT' ||
+                                 error.code === 'ENETUNREACH' ||
+                                 error.code === 'EHOSTUNREACH' ||
+                                 error.message.includes('connect ECONNREFUSED') ||
+                                 error.message.includes('ENOTFOUND') ||
+                                 error.message.includes('timeout');
+      if (isConnectionError) {
+        console.warn(`PostgreSQL connection failed (${error.message}). Operating in dev mode with mock DB fallback.`);
         useInMemoryDb = true;
         return simulateQuery(text, params);
       }
@@ -432,8 +440,17 @@ function simulateQuery(text, params) {
 // Transaction client helper
 async function getClient() {
   if (pool && !useInMemoryDb) {
-    const client = await pool.connect();
-    return client;
+    try {
+      const client = await pool.connect();
+      return client;
+    } catch (err) {
+      console.warn(`PostgreSQL getClient failed (${err.message}). Operating in dev mode with mock DB fallback.`);
+      useInMemoryDb = true;
+      return {
+        query: simulateQuery,
+        release: () => {}
+      };
+    }
   }
   return {
     query: simulateQuery,

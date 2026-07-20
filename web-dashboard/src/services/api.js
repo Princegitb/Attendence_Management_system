@@ -31,9 +31,34 @@ export function getCurrentUser() {
   return user ? JSON.parse(user) : null;
 }
 
-async function request(endpoint, options = {}) {
+async function refreshToken() {
+  const refreshTok = localStorage.getItem('guard_refresh_token');
+  if (!refreshTok) return null;
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: refreshTok })
+    });
+    const data = await res.json();
+    if (data.success && data.data?.accessToken) {
+      localStorage.setItem('guard_access_token', data.data.accessToken);
+      if (data.data.refreshToken) {
+        localStorage.setItem('guard_refresh_token', data.data.refreshToken);
+      }
+      return data.data.accessToken;
+    }
+  } catch (err) {
+    console.error('Silent token refresh error:', err);
+  }
+  return null;
+}
+
+async function request(endpoint, options = {}, isRetry = false) {
+  const token = localStorage.getItem('guard_access_token');
   const headers = {
-    ...getAuthHeader(),
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
 
@@ -44,10 +69,15 @@ async function request(endpoint, options = {}) {
 
   const data = await res.json();
 
-  if (res.status === 401 || (res.status === 403 && data.message && data.message.includes('token'))) {
-    logout();
-    window.location.reload();
-    throw new Error('Your session expired due to server restart. Please log in again.');
+  if ((res.status === 401 || (res.status === 403 && data.message && data.message.includes('token'))) && !isRetry) {
+    const newToken = await refreshToken();
+    if (newToken) {
+      return request(endpoint, options, true);
+    } else {
+      logout();
+      window.location.reload();
+      throw new Error('Your session expired. Please log in again.');
+    }
   }
 
   return data;
@@ -84,13 +114,10 @@ export const api = {
   importGuardsBulk: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    const token = localStorage.getItem('guard_access_token');
-    const res = await fetch(`${API_BASE}/guards/import`, {
+    return request('/guards/import', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
       body: formData
     });
-    return res.json();
   },
 
   // Posts

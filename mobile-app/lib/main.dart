@@ -7,7 +7,7 @@ void main() {
 }
 
 class GuardAttendanceApp extends StatelessWidget {
-  const GuardAttendanceApp({Key? key}) : super(key: key);
+  const GuardAttendanceApp({super.key});
 
   @override
   Widget build(BuildContext context) {
