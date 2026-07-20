@@ -32,17 +32,25 @@ let autoIncrementIds = {
 };
 
 try {
-  const isCloudDb = process.env.PGHOST && !process.env.PGHOST.includes('localhost') && !process.env.PGHOST.includes('127.0.0.1');
+  const isCloudDb = process.env.DATABASE_URL || (process.env.PGHOST && !process.env.PGHOST.includes('localhost') && !process.env.PGHOST.includes('127.0.0.1'));
 
-  pool = new Pool({
-    host: process.env.PGHOST || 'localhost',
-    port: parseInt(process.env.PGPORT || '5432'),
-    database: process.env.PGDATABASE || 'guard_attendance_db',
-    user: process.env.PGUSER || 'postgres',
-    password: process.env.PGPASSWORD || 'postgres',
-    connectionTimeoutMillis: 5000,
-    ...(isCloudDb ? { ssl: { rejectUnauthorized: false } } : {})
-  });
+  if (process.env.DATABASE_URL) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: 10000,
+      ssl: { rejectUnauthorized: false }
+    });
+  } else {
+    pool = new Pool({
+      host: process.env.PGHOST || 'localhost',
+      port: parseInt(process.env.PGPORT || '5432'),
+      database: process.env.PGDATABASE || 'guard_attendance_db',
+      user: process.env.PGUSER || 'postgres',
+      password: process.env.PGPASSWORD || 'postgres',
+      connectionTimeoutMillis: 10000,
+      ...(isCloudDb ? { ssl: { rejectUnauthorized: false } } : {})
+    });
+  }
 
   pool.on('error', (err) => {
     console.error('Unexpected error on idle PostgreSQL client:', err.message);
