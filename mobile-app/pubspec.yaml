@@ -1,0 +1,27 @@
+name: guard_attendance_mobile
+description: Field Officer Mobile App for Guard Attendance Verification System
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  geolocator: ^11.0.0
+  camera: ^0.10.5+9
+  flutter_secure_storage: ^9.0.0
+  path_provider: ^2.1.2
+  path: ^1.9.0
+  image: ^4.1.7
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
