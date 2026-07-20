@@ -1,7 +1,9 @@
-import React from 'react';
-import { X, MapPin, Camera, Clock, UserCheck, ShieldCheck, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, MapPin, Camera, Clock, UserCheck, ShieldCheck, AlertCircle, Maximize2 } from 'lucide-react';
 
 export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
+  const [expandedPhoto, setExpandedPhoto] = useState(null);
+
   if (!record) return null;
 
   return (
@@ -84,7 +86,7 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
               </div>
 
               {record.check_in_photo_url ? (
-                <div className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group">
+                <div className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group cursor-pointer" onClick={() => setExpandedPhoto(record.check_in_photo_url)}>
                   <img
                     src={record.check_in_photo_url}
                     alt="Check-in proof"
@@ -98,6 +100,9 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
                     <Camera className="w-8 h-8 mb-2 text-slate-500" />
                     <span>Live Photo Captured & Logged</span>
                     <span className="text-[10px] text-slate-500 mt-1">{record.check_in_photo_url}</span>
+                  </div>
+                  <div className="absolute top-2 right-2 p-1.5 bg-slate-900/80 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Maximize2 className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
@@ -132,7 +137,7 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
               </div>
 
               {record.check_out_photo_url ? (
-                <div className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group">
+                <div className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group cursor-pointer" onClick={() => setExpandedPhoto(record.check_out_photo_url)}>
                   <img
                     src={record.check_out_photo_url}
                     alt="Check-out proof"
@@ -146,6 +151,9 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
                     <Camera className="w-8 h-8 mb-2 text-slate-500" />
                     <span>Live Photo Captured & Logged</span>
                     <span className="text-[10px] text-slate-500 mt-1">{record.check_out_photo_url}</span>
+                  </div>
+                  <div className="absolute top-2 right-2 p-1.5 bg-slate-900/80 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Maximize2 className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
@@ -168,6 +176,13 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
             </div>
           </div>
         </div>
+
+        {/* Full Image Preview Modal */}
+        {expandedPhoto && (
+          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer" onClick={() => setExpandedPhoto(null)}>
+            <img src={expandedPhoto} alt="Full view" className="max-w-full max-h-full rounded-2xl shadow-2xl border border-slate-700" />
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between">

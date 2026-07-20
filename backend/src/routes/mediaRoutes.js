@@ -1,22 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
+const fs = require('fs');
 const { getLocalPhotoPath } = require('../utils/storage');
-const { authenticateToken } = require('../middleware/auth');
 
 /**
- * Authenticated proxy route for serving attendance photos
- * Ensures object storage / uploads remain private and unexposed to unauthorized users
+ * Public route for serving attendance photos in web dashboard <img> tags
  */
-router.get('/photo', authenticateToken, (req, res) => {
+router.get('/photo', (req, res) => {
   const { key } = req.query;
   if (!key) {
     return res.status(400).json({ success: false, message: 'Photo key is required.' });
   }
 
   const filePath = getLocalPhotoPath(key);
-  if (!filePath) {
-    return res.status(404).json({ success: false, message: 'Photo not found.' });
+  if (!filePath || !fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: 'Photo file not found.' });
   }
 
   return res.sendFile(filePath);
