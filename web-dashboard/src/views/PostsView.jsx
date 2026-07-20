@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, Plus, Edit2, Compass, ShieldCheck } from 'lucide-react';
+import { MapPin, Plus, Edit2 } from 'lucide-react';
 import { api } from '../services/api';
 import LocationPickerMap from '../components/LocationPickerMap';
 
@@ -66,8 +66,8 @@ export default function PostsView() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || formData.latitude === undefined || formData.longitude === undefined) {
-      setError('Post name, latitude, and longitude are required.');
+    if (!formData.name || formData.latitude === undefined || formData.longitude === undefined || isNaN(formData.latitude) || isNaN(formData.longitude)) {
+      setError('Post name, valid latitude, and longitude are required.');
       return;
     }
 
@@ -95,9 +95,9 @@ export default function PostsView() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            Posts & Locations (OpenStreetMap Geo-Fence) <MapPin className="w-5 h-5 text-sky-400" />
+            Posts & Locations (Geo-Fence Setup) <MapPin className="w-5 h-5 text-sky-400" />
           </h2>
-          <p className="text-xs text-slate-400">Interactive map picker powered by OpenStreetMap & Leaflet.js (No Google Maps API).</p>
+          <p className="text-xs text-slate-400">Configure security posts and GPS geo-fence radiuses for guard verification.</p>
         </div>
 
         <button
@@ -154,7 +154,7 @@ export default function PostsView() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-white">
-              {editingPost ? 'Edit Post & Geo-Fence Coordinates' : 'Create New Security Post'}
+              {editingPost ? 'Edit Security Post Details' : 'Create New Security Post'}
             </h3>
 
             {error && <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl">{error}</div>}
@@ -195,41 +195,21 @@ export default function PostsView() {
                 />
               </div>
 
-              {/* Interactive OpenStreetMap Leaflet Location Picker */}
+              {/* Card-Free Location & Coordinates Picker */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Interactive Location Picker (OpenStreetMap + Leaflet)</label>
                 <LocationPickerMap
-                  lat={formData.latitude}
-                  lng={formData.longitude}
+                  latitude={formData.latitude}
+                  longitude={formData.longitude}
                   radius={formData.allowed_radius_metres}
-                  onLocationSelect={(lat, lng) => {
-                    setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }));
+                  onLocationSelect={({ latitude, longitude, address }) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      latitude: parseFloat(latitude),
+                      longitude: parseFloat(longitude),
+                      address: address ? address.split(',')[0] : prev.address
+                    }));
                   }}
                 />
-              </div>
-
-              {/* Manual Lat/Long Entry Fallback */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Manual Latitude Entry</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.latitude}
-                    onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Manual Longitude Entry</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.longitude}
-                    onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
-                  />
-                </div>
               </div>
 
               <div className="pt-2 flex justify-end space-x-3">
