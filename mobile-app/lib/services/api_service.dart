@@ -7,10 +7,7 @@ import '../models/guard.dart';
 
 class ApiService {
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:5000/api';
-    }
-    return 'http://10.186.22.176:5000/api';
+    return 'https://attendence-management-system-8hkm.onrender.com/api';
   }
 
   static const _storage = FlutterSecureStorage();
@@ -32,7 +29,7 @@ class ApiService {
     try {
       return jsonDecode(response.body);
     } catch (e) {
-      throw Exception('Server returned invalid response (Status ${response.statusCode}). Ensure backend server is active on port 5000.');
+      throw Exception('Server returned invalid response (Status ${response.statusCode}). Ensure backend server is active.');
     }
   }
 
