@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const provider = process.env.STORAGE_PROVIDER || 'local';
+const provider = process.env.STORAGE_PROVIDER || 'db';
 const uploadsDir = path.join(__dirname, '../../uploads/photos');
 
 if (!fs.existsSync(uploadsDir)) {
@@ -25,7 +25,7 @@ if (provider === 's3' && process.env.S3_ACCESS_KEY_ID) {
 }
 
 /**
- * Uploads photo buffer to storage
+ * Uploads photo buffer to storage (Database Base64 Data URL, S3, or Local)
  * @returns {Promise<{ key: string, url: string }>}
  */
 async function uploadPhoto(buffer, originalName = 'photo.jpg') {
@@ -47,16 +47,23 @@ async function uploadPhoto(buffer, originalName = 'photo.jpg') {
       key: filename,
       url: `/api/media/photo?key=${filename}`
     };
-  } else {
-    // Local File Storage
+  }
+
+  // Bulletproof Base64 Database Storage for zero-cost permanent persistence
+  const base64Url = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+
+  // Also write to local disk as fallback if available
+  try {
     const filePath = path.join(uploadsDir, filename);
     fs.writeFileSync(filePath, buffer);
-
-    return {
-      key: filename,
-      url: `/api/media/photo?key=${filename}`
-    };
+  } catch (err) {
+    console.warn('Local disk write skipped:', err.message);
   }
+
+  return {
+    key: filename,
+    url: base64Url
+  };
 }
 
 function getLocalPhotoPath(key) {
