@@ -3,6 +3,7 @@ import { ClipboardCheck, Filter, Calendar, Eye, Edit3, Camera, MapPin, RefreshCw
 import { api } from '../services/api';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import ManualCorrectionModal from '../components/ManualCorrectionModal';
+import ConfirmActionModal from '../components/ConfirmActionModal';
 
 export default function AttendanceView() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -17,6 +18,9 @@ export default function AttendanceView() {
   const [loading, setLoading] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [correctingRecord, setCorrectingRecord] = useState(null);
+
+  const [confirmModalData, setConfirmModalData] = useState(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -50,16 +54,26 @@ export default function AttendanceView() {
     }
   };
 
-  const handleQuickStatusChange = async (id, newStatus, reason) => {
+  const promptStatusConfirmation = (id, newStatus, guardName, reason) => {
+    setConfirmModalData({ id, newStatus, guardName, reason });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmModalData) return;
+    setConfirmLoading(true);
     try {
+      const { id, newStatus, reason } = confirmModalData;
       const res = await api.correctAttendance(id, newStatus, reason);
       if (res.success) {
+        setConfirmModalData(null);
         loadData();
       } else {
         alert(res.message || 'Action failed.');
       }
     } catch (err) {
       alert(err.message || 'Failed to update status.');
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -222,14 +236,14 @@ export default function AttendanceView() {
                       {rec.status === 'PENDING_REVIEW' && (
                         <>
                           <button
-                            onClick={() => handleQuickStatusChange(rec.id, 'APPROVED', 'Approved by Manager after review')}
+                            onClick={() => promptStatusConfirmation(rec.id, 'APPROVED', rec.guard_name, 'Approved by Manager after review')}
                             title="Approve Attendance"
                             className="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                           </button>
                           <button
-                            onClick={() => handleQuickStatusChange(rec.id, 'REJECTED', 'Rejected by Manager after review')}
+                            onClick={() => promptStatusConfirmation(rec.id, 'REJECTED', rec.guard_name, 'Rejected by Manager after review')}
                             title="Reject Attendance"
                             className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
                           >
@@ -240,7 +254,7 @@ export default function AttendanceView() {
 
                       {rec.status !== 'PENDING_REVIEW' && rec.status !== 'REJECTED' && (
                         <button
-                          onClick={() => handleQuickStatusChange(rec.id, 'REJECTED', 'Manually rejected by Manager')}
+                          onClick={() => promptStatusConfirmation(rec.id, 'REJECTED', rec.guard_name, 'Manually rejected by Manager')}
                           title="Reject Attendance"
                           className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
                         >
@@ -271,6 +285,18 @@ export default function AttendanceView() {
           </table>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmModalData && (
+        <ConfirmActionModal
+          isOpen={!!confirmModalData}
+          actionType={confirmModalData.newStatus}
+          guardName={confirmModalData.guardName}
+          loading={confirmLoading}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmModalData(null)}
+        />
+      )}
 
       {/* Detail Modal */}
       {selectedRecord && (
