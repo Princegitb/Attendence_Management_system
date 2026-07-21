@@ -236,13 +236,17 @@ function simulateQuery(text, params) {
       let res = inMemoryTables.attendance.map(a => {
         const guard = inMemoryTables.guards.find(g => String(g.id) === String(a.guard_id));
         const post = inMemoryTables.posts.find(p => String(p.id) === String(g?.assigned_post_id));
+        const shift = inMemoryTables.shifts.find(s => String(s.id) === String(g?.assigned_shift_id)) || inMemoryTables.shifts[0];
         const officer = inMemoryTables.field_officers.find(o => String(o.id) === String(a.marked_by_officer_id));
         return {
           ...a,
           guard_name: guard ? guard.name : 'Guard',
           guard_mobile: guard ? guard.mobile : '',
           post_name: post ? post.name : 'Post',
-          marked_by_officer: officer ? officer.name : 'Officer'
+          marked_by_officer: officer ? officer.name : 'Officer',
+          shift_name: shift ? shift.name : 'Shift',
+          shift_start_time: shift ? shift.start_time : '08:00:00',
+          shift_end_time: shift ? shift.end_time : '16:00:00'
         };
       });
 

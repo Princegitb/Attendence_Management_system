@@ -5,6 +5,22 @@ import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import ManualCorrectionModal from '../components/ManualCorrectionModal';
 import ConfirmActionModal from '../components/ConfirmActionModal';
 
+const formatTime12h = (timeVal) => {
+  if (!timeVal) return '-';
+  if (typeof timeVal === 'string' && timeVal.includes('T')) {
+    return new Date(timeVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  if (typeof timeVal === 'string' && timeVal.includes(':')) {
+    const parts = timeVal.split(':');
+    const hours = parseInt(parts[0], 10);
+    const mins = parts[1] || '00';
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${String(hours12).padStart(2, '0')}:${mins} ${suffix}`;
+  }
+  return String(timeVal);
+};
+
 export default function AttendanceView() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [officerId, setOfficerId] = useState('');
@@ -184,8 +200,10 @@ export default function AttendanceView() {
               <tr>
                 <th className="p-3.5 border-b border-slate-700">Guard Name</th>
                 <th className="p-3.5 border-b border-slate-700">Assigned Post</th>
-                <th className="p-3.5 border-b border-slate-700">Check-In</th>
-                <th className="p-3.5 border-b border-slate-700">Check-Out</th>
+                <th className="p-3.5 border-b border-slate-700 text-indigo-400">Expected Check-In</th>
+                <th className="p-3.5 border-b border-slate-700 text-sky-400">Actual Check-In</th>
+                <th className="p-3.5 border-b border-slate-700 text-indigo-400">Expected Check-Out</th>
+                <th className="p-3.5 border-b border-slate-700 text-sky-400">Actual Check-Out</th>
                 <th className="p-3.5 border-b border-slate-700">Distance</th>
                 <th className="p-3.5 border-b border-slate-700">Marked By (Officer)</th>
                 <th className="p-3.5 border-b border-slate-700">Status</th>
@@ -195,11 +213,11 @@ export default function AttendanceView() {
             <tbody className="divide-y divide-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-slate-400">Loading attendance data...</td>
+                  <td colSpan={10} className="p-6 text-center text-slate-400">Loading attendance data...</td>
                 </tr>
               ) : attendance.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-slate-500">No attendance records found for current filter.</td>
+                  <td colSpan={10} className="p-6 text-center text-slate-500">No attendance records found for current filter.</td>
                 </tr>
               ) : (
                 attendance.map((rec) => (
@@ -209,11 +227,17 @@ export default function AttendanceView() {
                       <div className="text-[10px] text-slate-500">{rec.guard_mobile || 'No mobile'}</div>
                     </td>
                     <td className="p-3.5 text-slate-300">{rec.post_name}</td>
-                    <td className="p-3.5 font-mono text-slate-300">
-                      {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString() : '-'}
+                    <td className="p-3.5 font-mono text-indigo-300 font-medium">
+                      {formatTime12h(rec.shift_start_time)}
                     </td>
-                    <td className="p-3.5 font-mono text-slate-300">
-                      {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString() : '-'}
+                    <td className="p-3.5 font-mono text-slate-200 font-semibold">
+                      {rec.check_in_time ? formatTime12h(rec.check_in_time) : '-'}
+                    </td>
+                    <td className="p-3.5 font-mono text-indigo-300 font-medium">
+                      {formatTime12h(rec.shift_end_time)}
+                    </td>
+                    <td className="p-3.5 font-mono text-slate-200 font-semibold">
+                      {rec.check_out_time ? formatTime12h(rec.check_out_time) : '-'}
                     </td>
                     <td className="p-3.5 font-mono text-emerald-400 font-semibold">
                       {rec.check_in_distance_from_post || 0}m

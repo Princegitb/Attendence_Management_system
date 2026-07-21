@@ -388,6 +388,7 @@ async function getAttendanceLogs(req, res) {
     let queryStr = `
       SELECT a.id, a.guard_id, g.name AS guard_name, g.mobile AS guard_mobile,
              p.name AS post_name, p.latitude AS post_lat, p.longitude AS post_lon, p.allowed_radius_metres,
+             s.name AS shift_name, s.start_time AS shift_start_time, s.end_time AS shift_end_time,
              fo.name AS marked_by_officer,
              a.date, a.check_in_time, a.check_in_latitude, a.check_in_longitude, a.check_in_gps_accuracy,
              a.check_in_distance_from_post, a.check_in_photo_url,
@@ -396,6 +397,7 @@ async function getAttendanceLogs(req, res) {
       FROM attendance a
       JOIN guards g ON a.guard_id = g.id
       JOIN posts p ON g.assigned_post_id = p.id
+      LEFT JOIN shifts s ON g.assigned_shift_id = s.id
       JOIN field_officers fo ON a.marked_by_officer_id = fo.id
       WHERE a.date = $1
     `;
