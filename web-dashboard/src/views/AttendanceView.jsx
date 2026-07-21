@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ClipboardCheck, Filter, Calendar, Eye, Edit3, Camera, MapPin, RefreshCw } from 'lucide-react';
+import { ClipboardCheck, Filter, Calendar, Eye, Edit3, Camera, MapPin, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import ManualCorrectionModal from '../components/ManualCorrectionModal';
@@ -50,6 +50,21 @@ export default function AttendanceView() {
     }
   };
 
+  const handleQuickStatusChange = async (id, newStatus, reason) => {
+    try {
+      const res = await api.correctAttendance(id, newStatus, reason);
+      if (res.success) {
+        loadData();
+      } else {
+        alert(res.message || 'Action failed.');
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to update status.');
+    }
+  };
+
+  const pendingReviewCount = attendance.filter(a => a.status === 'PENDING_REVIEW').length;
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -68,6 +83,27 @@ export default function AttendanceView() {
           <RefreshCw className="w-4 h-4" /> Refresh Feed
         </button>
       </div>
+
+      {/* Pending Review Alert Banner */}
+      {pendingReviewCount > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between text-amber-400 text-xs shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/20 rounded-xl">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-white">Action Required: {pendingReviewCount} Late Check-in(s) Pending Review</span>
+              <p className="text-slate-300">Late check-ins (outside shift grace period) require Manager review and explicit approval/rejection.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setStatusFilter('PENDING_REVIEW')}
+            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors shrink-0"
+          >
+            Filter Pending ({pendingReviewCount})
+          </button>
+        </div>
+      )}
 
       {/* Filters Bar */}
       <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -117,10 +153,11 @@ export default function AttendanceView() {
             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
           >
             <option value="">All Statuses</option>
+            <option value="APPROVED">APPROVED (Auto / Manual)</option>
+            <option value="PENDING_REVIEW">PENDING_REVIEW (Late Check-Ins)</option>
+            <option value="REJECTED">REJECTED</option>
             <option value="CHECKED_IN">CHECKED_IN</option>
             <option value="CHECKED_OUT">CHECKED_OUT</option>
-            <option value="LATE">LATE</option>
-            <option value="ABSENT">ABSENT</option>
           </select>
         </div>
       </div>
@@ -169,28 +206,60 @@ export default function AttendanceView() {
                     </td>
                     <td className="p-3.5 text-sky-400 font-medium">{rec.marked_by_officer}</td>
                     <td className="p-3.5">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                        rec.status === 'CHECKED_OUT'
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        rec.status === 'APPROVED' || rec.status === 'CHECKED_OUT'
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                          : rec.status === 'CHECKED_IN'
-                          ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          : rec.status === 'PENDING_REVIEW'
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
+                          : rec.status === 'REJECTED'
+                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                          : 'bg-sky-500/10 text-sky-400 border-sky-500/30'
                       }`}>
-                        {rec.status}
+                        {rec.status === 'PENDING_REVIEW' ? 'PENDING REVIEW (LATE)' : rec.status}
                       </span>
                     </td>
-                    <td className="p-3.5 text-right space-x-2">
+                    <td className="p-3.5 text-right space-x-1.5">
+                      {rec.status === 'PENDING_REVIEW' && (
+                        <>
+                          <button
+                            onClick={() => handleQuickStatusChange(rec.id, 'APPROVED', 'Approved by Manager after review')}
+                            title="Approve Attendance"
+                            className="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                          </button>
+                          <button
+                            onClick={() => handleQuickStatusChange(rec.id, 'REJECTED', 'Rejected by Manager after review')}
+                            title="Reject Attendance"
+                            className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </button>
+                        </>
+                      )}
+
+                      {rec.status !== 'PENDING_REVIEW' && rec.status !== 'REJECTED' && (
+                        <button
+                          onClick={() => handleQuickStatusChange(rec.id, 'REJECTED', 'Manually rejected by Manager')}
+                          title="Reject Attendance"
+                          className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      )}
+
                       <button
                         onClick={() => setSelectedRecord(rec)}
                         title="View Photos & Details"
-                        className="px-2.5 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1"
+                        className="px-2.5 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5" /> Details
                       </button>
+
                       <button
                         onClick={() => setCorrectingRecord(rec)}
                         title="Manual Correction"
-                        className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1"
+                        className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1"
                       >
                         <Edit3 className="w-3.5 h-3.5" /> Correct
                       </button>

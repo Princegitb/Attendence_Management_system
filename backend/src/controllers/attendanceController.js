@@ -54,8 +54,10 @@ async function getOfficerGuardsChecklist(req, res) {
       let status = 'PENDING';
       if (row.check_out_time) {
         status = 'CHECKED_OUT';
+      } else if (row.attendance_status) {
+        status = row.attendance_status;
       } else if (row.check_in_time) {
-        status = 'CHECKED_IN';
+        status = 'APPROVED';
       }
 
       return {
@@ -94,7 +96,7 @@ async function getOfficerGuardsChecklist(req, res) {
         date: today,
         totalGuards: guardsList.length,
         pendingCount: guardsList.filter(g => g.attendance.status === 'PENDING').length,
-        checkedInCount: guardsList.filter(g => g.attendance.status === 'CHECKED_IN').length,
+        checkedInCount: guardsList.filter(g => ['APPROVED', 'PENDING_REVIEW', 'CHECKED_IN'].includes(g.attendance.status)).length,
         checkedOutCount: guardsList.filter(g => g.attendance.status === 'CHECKED_OUT').length,
         guards: guardsList
       }
@@ -138,11 +140,13 @@ async function markCheckIn(req, res) {
       });
     }
 
-    // 2. Fetch Guard & Assigned Post
+    // 2. Fetch Guard, Assigned Post & Assigned Shift
     const guardRes = await db.query(
-      `SELECT g.id, g.name, p.id AS post_id, p.name AS post_name, p.latitude AS post_lat, p.longitude AS post_lon, p.allowed_radius_metres
+      `SELECT g.id, g.name, p.id AS post_id, p.name AS post_name, p.latitude AS post_lat, p.longitude AS post_lon, p.allowed_radius_metres,
+              s.id AS shift_id, s.name AS shift_name, s.start_time, s.end_time, s.grace_period_minutes
        FROM guards g
        JOIN posts p ON g.assigned_post_id = p.id
+       LEFT JOIN shifts s ON g.assigned_shift_id = s.id
        WHERE g.id = $1 AND g.status = 'ACTIVE'`,
       [guard_id]
     );
@@ -152,11 +156,11 @@ async function markCheckIn(req, res) {
     }
 
     const guard = guardRes.rows[0];
-    const postLat = parseFloat(guard.post_lat);
-    const postLon = parseFloat(guard.post_lon);
+    const postLat = parseFloat(guard.post_lat !== undefined ? guard.post_lat : guard.post_latitude);
+    const postLon = parseFloat(guard.post_lon !== undefined ? guard.post_lon : guard.post_longitude);
     const allowedRadius = parseInt(guard.allowed_radius_metres || 100);
 
-    // 3. Server-Side Haversine Geo-fence Verification
+    // 3. Server-Side Haversine Geo-fence Verification (STRICT: Reject if location is wrong)
     const distanceMeters = calculateHaversineDistance(latitude, longitude, postLat, postLon);
 
     if (distanceMeters > allowedRadius) {
@@ -175,10 +179,28 @@ async function markCheckIn(req, res) {
       });
     }
 
-    // 5. Upload compressed photo to object storage
+    // 5. Shift & Grace Period Verification (Auto-Approve if within Grace Period, else PENDING_REVIEW for Manager)
+    let initialStatus = 'APPROVED';
+    let statusMessage = `Check-in recorded and automatically approved for ${guard.name} (On Time / Grace Period).`;
+
+    if (guard.start_time) {
+      const [shHours, shMinutes] = guard.start_time.split(':').map(Number);
+      const shiftStartTime = new Date(serverTimestamp);
+      shiftStartTime.setHours(shHours, shMinutes, 0, 0);
+
+      const graceMinutes = parseInt(guard.grace_period_minutes || 15);
+      const cutoffTime = new Date(shiftStartTime.getTime() + graceMinutes * 60 * 1000);
+
+      if (serverTimestamp > cutoffTime) {
+        initialStatus = 'PENDING_REVIEW';
+        statusMessage = `Check-in submitted for ${guard.name} (Late check-in). Kept for Manager review.`;
+      }
+    }
+
+    // 6. Upload compressed photo to object storage
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 6. Create or update attendance record with snapshots
+    // 7. Create attendance record with initial status (APPROVED or PENDING_REVIEW)
     const insertRes = await db.query(
       `INSERT INTO attendance (
         guard_id, marked_by_officer_id, date, check_in_time, 
@@ -199,7 +221,7 @@ async function markCheckIn(req, res) {
         uploadResult.url,
         guard.post_id,
         allowedRadius,
-        'CHECKED_IN'
+        initialStatus
       ]
     );
 
@@ -209,12 +231,12 @@ async function markCheckIn(req, res) {
       performedByRole: 'OFFICER',
       targetType: 'Guard',
       targetId: guard.id,
-      reason: `Guard ${guard.name} checked in successfully (${distanceMeters}m from post)`
+      reason: `Guard ${guard.name} checked in (${distanceMeters}m from post). Status: ${initialStatus}`
     });
 
     return res.json({
       success: true,
-      message: `Check-in recorded for ${guard.name} successfully.`,
+      message: statusMessage,
       data: {
         attendanceId: insertRes.rows[0].id,
         guardId: guard.id,
@@ -222,7 +244,7 @@ async function markCheckIn(req, res) {
         checkInTime: insertRes.rows[0].check_in_time,
         distanceMeters,
         photoUrl: uploadResult.url,
-        status: 'CHECKED_IN'
+        status: initialStatus
       }
     });
 

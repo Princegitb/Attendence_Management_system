@@ -266,7 +266,22 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     Color text = Colors.amberAccent;
     String label = 'PENDING';
 
-    if (status == 'CHECKED_IN') {
+    if (status == 'APPROVED') {
+      bg = const Color(0xFF10B981).withValues(alpha: 0.15);
+      border = const Color(0xFF10B981);
+      text = const Color(0xFF34D399);
+      label = 'APPROVED';
+    } else if (status == 'PENDING_REVIEW') {
+      bg = Colors.amber.withValues(alpha: 0.2);
+      border = Colors.amber;
+      text = Colors.amberAccent;
+      label = 'PENDING REVIEW';
+    } else if (status == 'REJECTED') {
+      bg = Colors.red.withValues(alpha: 0.15);
+      border = Colors.red;
+      text = Colors.redAccent;
+      label = 'REJECTED';
+    } else if (status == 'CHECKED_IN') {
       bg = const Color(0xFF0284C7).withValues(alpha: 0.15);
       border = const Color(0xFF0284C7);
       text = const Color(0xFF38BDF8);

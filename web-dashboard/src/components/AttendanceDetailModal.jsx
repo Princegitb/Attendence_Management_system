@@ -1,10 +1,29 @@
 import React, { useState } from 'react';
-import { X, MapPin, Camera, Clock, UserCheck, ShieldCheck, AlertCircle, Maximize2 } from 'lucide-react';
+import { X, MapPin, Camera, Clock, UserCheck, ShieldCheck, AlertCircle, Maximize2, CheckCircle2, XCircle } from 'lucide-react';
+import { api } from '../services/api';
 
-export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
+export default function AttendanceDetailModal({ record, onClose, onCorrect, onUpdate }) {
   const [expandedPhoto, setExpandedPhoto] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   if (!record) return null;
+
+  const handleStatusChange = async (newStatus, defaultReason) => {
+    setActionLoading(true);
+    try {
+      const res = await api.correctAttendance(record.id, newStatus, defaultReason);
+      if (res.success) {
+        if (onUpdate) onUpdate();
+        onClose();
+      } else {
+        alert(res.message || 'Action failed.');
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to update attendance status.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -18,14 +37,16 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 Attendance Verification Details
-                <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-                  record.status === 'CHECKED_OUT'
+                <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                  record.status === 'APPROVED' || record.status === 'CHECKED_OUT'
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                    : record.status === 'CHECKED_IN'
-                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    : record.status === 'PENDING_REVIEW'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
+                    : record.status === 'REJECTED'
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                    : 'bg-sky-500/10 text-sky-400 border-sky-500/30'
                 }`}>
-                  {record.status}
+                  {record.status === 'PENDING_REVIEW' ? 'PENDING REVIEW (LATE)' : record.status}
                 </span>
               </h2>
               <p className="text-xs text-slate-400">Date: {record.date} | Guard: {record.guard_name}</p>
@@ -191,10 +212,24 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect }) {
             <span>Server-side Haversine formula verified coordinates.</span>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <button
+              disabled={actionLoading}
+              onClick={() => handleStatusChange('APPROVED', 'Approved by Manager from details modal')}
+              className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Approve
+            </button>
+            <button
+              disabled={actionLoading}
+              onClick={() => handleStatusChange('REJECTED', 'Rejected by Manager after photo/location review')}
+              className="px-3.5 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <XCircle className="w-4 h-4" /> Reject
+            </button>
             <button
               onClick={() => onCorrect(record)}
-              className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold transition-colors"
+              className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold transition-colors"
             >
               Manual Correction
             </button>

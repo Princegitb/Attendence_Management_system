@@ -185,15 +185,29 @@ function simulateQuery(text, params) {
 
     if (lowerSql.includes('from guards')) {
       let res = inMemoryTables.guards.map(g => {
-        const post = inMemoryTables.posts.find(p => String(p.id) === String(g.assigned_post_id));
-        const shift = inMemoryTables.shifts.find(s => String(s.id) === String(g.assigned_shift_id));
+        const post = inMemoryTables.posts.find(p => String(p.id) === String(g.assigned_post_id)) || inMemoryTables.posts[0] || {
+          id: 1, name: 'Main Gate - HQ', latitude: 28.613939, longitude: 77.209021, allowed_radius_metres: 100
+        };
+        const shift = inMemoryTables.shifts.find(s => String(s.id) === String(g.assigned_shift_id)) || inMemoryTables.shifts[0] || {
+          id: 1, name: 'Day Shift', start_time: '08:00:00', end_time: '16:00:00', grace_period_minutes: 15
+        };
         return {
           ...g,
+          post_id: post ? post.id : 1,
           post_name: post ? post.name : 'Unassigned',
-          shift_name: shift ? shift.name : 'Unassigned'
+          post_lat: post ? post.latitude : 28.613939,
+          post_lon: post ? post.longitude : 77.209021,
+          post_latitude: post ? post.latitude : 28.613939,
+          post_longitude: post ? post.longitude : 77.209021,
+          allowed_radius_metres: post ? post.allowed_radius_metres : 100,
+          shift_id: shift ? shift.id : 1,
+          shift_name: shift ? shift.name : 'Unassigned',
+          start_time: shift ? shift.start_time : '08:00:00',
+          end_time: shift ? shift.end_time : '16:00:00',
+          grace_period_minutes: shift ? shift.grace_period_minutes : 15
         };
       });
-      if (lowerSql.includes('where id = $1')) {
+      if (lowerSql.includes('where g.id = $1') || lowerSql.includes('where id = $1')) {
         res = res.filter(g => String(g.id) === String(params[0]));
       }
       return { rows: res, rowCount: res.length };
