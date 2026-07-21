@@ -121,7 +121,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     });
 
     try {
-      final isCheckIn = widget.guard.attendanceStatus == 'PENDING';
+      final isCheckIn = widget.guard.checkInTime == null && widget.guard.attendanceStatus == 'PENDING';
       final res = await ApiService.markAttendance(
         guardId: widget.guard.guardId,
         isCheckIn: isCheckIn,
@@ -188,7 +188,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     const emeraldColor = Color(0xFF10B981);
     const emeraldAccent = Color(0xFF34D399);
 
-    final isCheckIn = widget.guard.attendanceStatus == 'PENDING';
+    final isCheckIn = widget.guard.checkInTime == null && widget.guard.attendanceStatus == 'PENDING';
     final actionLabel = isCheckIn ? 'Mark Check-In' : 'Mark Check-Out';
 
     return Scaffold(
