@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
 import { X, MapPin, Camera, Clock, UserCheck, ShieldCheck, AlertCircle, Maximize2, CheckCircle2, XCircle } from 'lucide-react';
 import { api } from '../services/api';
+import ConfirmActionModal from './ConfirmActionModal';
 
 export default function AttendanceDetailModal({ record, onClose, onCorrect, onUpdate }) {
   const [expandedPhoto, setExpandedPhoto] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [confirmModalData, setConfirmModalData] = useState(null);
 
   if (!record) return null;
 
-  const handleStatusChange = async (newStatus, defaultReason) => {
+  const promptStatusConfirmation = (newStatus, reason) => {
+    setConfirmModalData({ newStatus, reason });
+  };
+
+  const executeConfirmedStatusChange = async () => {
+    if (!confirmModalData) return;
     setActionLoading(true);
     try {
-      const res = await api.correctAttendance(record.id, newStatus, defaultReason);
+      const { newStatus, reason } = confirmModalData;
+      const res = await api.correctAttendance(record.id, newStatus, reason);
       if (res.success) {
+        setConfirmModalData(null);
         if (onUpdate) onUpdate();
         onClose();
       } else {
@@ -23,6 +32,14 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const getFullImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const serverOrigin = API_BASE.replace(/\/api\/?$/, '');
+    return `${serverOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
   };
 
   return (
@@ -107,84 +124,62 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
               </div>
 
               {record.check_in_photo_url ? (
-                <div className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group cursor-pointer" onClick={() => setExpandedPhoto(record.check_in_photo_url)}>
+                <div
+                  className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group cursor-pointer"
+                  onClick={() => setExpandedPhoto(getFullImageUrl(record.check_in_photo_url))}
+                >
                   <img
-                    src={record.check_in_photo_url}
+                    src={getFullImageUrl(record.check_in_photo_url)}
                     alt="Check-in proof"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
                   />
-                  <div className="hidden absolute inset-0 bg-slate-900 flex-col items-center justify-center text-slate-400 text-xs p-4 text-center">
-                    <Camera className="w-8 h-8 mb-2 text-slate-500" />
-                    <span>Live Photo Captured & Logged</span>
-                    <span className="text-[10px] text-slate-500 mt-1">{record.check_in_photo_url}</span>
-                  </div>
                   <div className="absolute top-2 right-2 p-1.5 bg-slate-900/80 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity">
                     <Maximize2 className="w-4 h-4" />
                   </div>
-                <div 
-                  className="relative group aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 cursor-pointer"
-                  onClick={() => setExpandedPhoto(getFullImageUrl(record.check_in_photo_url))}
-                >
-                  <img 
-                    src={getFullImageUrl(record.check_in_photo_url)} 
-                    alt="Check In Proof" 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition-opacity">
-                    Click to Enlarge
-                  </div>
                 </div>
               ) : (
-                <div className="aspect-video bg-slate-900 rounded-lg border border-dashed border-slate-700 flex items-center justify-center text-slate-500 text-xs">
-                  No Check-In Photo
+                <div className="aspect-video bg-slate-950/60 rounded-lg border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 text-xs">
+                  <Camera className="w-8 h-8 mb-1 opacity-50" />
+                  <span>No check-in photo recorded</span>
                 </div>
               )}
 
-              {/* Coords & Distance */}
               <div className="text-[11px] text-slate-400 space-y-1 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
                 <div className="flex justify-between">
                   <span>GPS Coords:</span>
                   <span className="font-mono text-slate-300">{record.check_in_latitude}, {record.check_in_longitude}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Post Distance:</span>
-                  <span className="font-mono text-emerald-400 font-bold">{record.check_in_distance_from_post || 0}m away</span>
-                </div>
-                <div className="flex justify-between">
                   <span>GPS Accuracy:</span>
-                  <span className="font-mono text-slate-400">±{record.check_in_gps_accuracy || 0}m</span>
+                  <span className="font-mono text-slate-300">±{record.check_in_gps_accuracy || 5}m</span>
                 </div>
               </div>
             </div>
 
-            {/* Check-Out Card */}
-            <div className="bg-slate-800/50 border border-slate-700/60 p-4 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
-                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4" /> Check-Out Details
+            {/* Check-Out Photo Box */}
+            <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <Camera className="w-4 h-4" /> Check-Out Live Photo Proof
                 </span>
-                <span className="text-xs font-mono text-slate-300">
+                <span className="text-slate-400 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
                   {record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString() : 'Pending'}
                 </span>
               </div>
 
-              {/* Photo */}
               {record.check_out_photo_url ? (
-                <div 
-                  className="relative group aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 cursor-pointer"
+                <div
+                  className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center relative group cursor-pointer"
                   onClick={() => setExpandedPhoto(getFullImageUrl(record.check_out_photo_url))}
                 >
-                  <img 
-                    src={getFullImageUrl(record.check_out_photo_url)} 
-                    alt="Check Out Proof" 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                  <img
+                    src={getFullImageUrl(record.check_out_photo_url)}
+                    alt="Check-out proof"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition-opacity">
-                    Click to Enlarge
+                  <div className="absolute top-2 right-2 p-1.5 bg-slate-900/80 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Maximize2 className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
@@ -228,7 +223,7 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
         )}
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between sticky bottom-0 z-10">
           <div className="text-xs text-slate-400 flex items-center gap-1.5">
             <AlertCircle className="w-4 h-4 text-sky-400" />
             <span>Server-side Haversine formula verified coordinates.</span>
