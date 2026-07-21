@@ -295,6 +295,30 @@ async function updatePost(req, res) {
   }
 }
 
+async function deletePost(req, res) {
+  try {
+    const { id } = req.params;
+    const oldRes = await db.query(`SELECT * FROM posts WHERE id = $1`, [id]);
+    if (oldRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Post location not found.' });
+
+    await db.query(`DELETE FROM posts WHERE id = $1`, [id]);
+
+    await logAuditEvent({
+      action: 'DELETE_POST',
+      performedBy: req.user.name,
+      performedByRole: 'MANAGER',
+      targetType: 'Post',
+      targetId: id,
+      oldValue: oldRes.rows[0],
+      reason: `Post "${oldRes.rows[0].name}" deleted by Manager`
+    });
+
+    return res.json({ success: true, message: 'Security post location deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 // ==========================================
 // 4. SHIFT MANAGEMENT
 // ==========================================
@@ -321,6 +345,30 @@ async function createShift(req, res) {
     );
 
     return res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+async function deleteShift(req, res) {
+  try {
+    const { id } = req.params;
+    const oldRes = await db.query(`SELECT * FROM shifts WHERE id = $1`, [id]);
+    if (oldRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Shift not found.' });
+
+    await db.query(`DELETE FROM shifts WHERE id = $1`, [id]);
+
+    await logAuditEvent({
+      action: 'DELETE_SHIFT',
+      performedBy: req.user.name,
+      performedByRole: 'MANAGER',
+      targetType: 'Shift',
+      targetId: id,
+      oldValue: oldRes.rows[0],
+      reason: `Shift "${oldRes.rows[0].name}" deleted by Manager`
+    });
+
+    return res.json({ success: true, message: 'Shift deleted successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -581,8 +629,10 @@ module.exports = {
   getPosts,
   createPost,
   updatePost,
+  deletePost,
   getShifts,
   createShift,
+  deleteShift,
   getAssignments,
   createAssignment,
   deleteAssignment,

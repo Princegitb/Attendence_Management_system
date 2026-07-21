@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, Plus, Edit2 } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import LocationPickerMap from '../components/LocationPickerMap';
 
@@ -35,6 +35,20 @@ export default function PostsView() {
   useEffect(() => {
     loadPosts();
   }, []);
+
+  const handleDeletePost = async (id, postName) => {
+    if (!window.confirm(`Are you sure you want to delete security post "${postName}"?`)) return;
+    try {
+      const res = await api.deletePost(id);
+      if (res.success) {
+        loadPosts();
+      } else {
+        alert(res.message || 'Delete failed.');
+      }
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
+  };
 
   const handleOpenCreate = () => {
     setEditingPost(null);
@@ -122,12 +136,22 @@ export default function PostsView() {
                   <h3 className="text-sm font-bold text-white">{post.name}</h3>
                   <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{post.address || 'No address specified'}</p>
                 </div>
-                <button
-                  onClick={() => handleOpenEdit(post)}
-                  className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => handleOpenEdit(post)}
+                    title="Edit Post"
+                    className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeletePost(post.id, post.name)}
+                    title="Delete Post Location"
+                    className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 text-xs space-y-1.5">

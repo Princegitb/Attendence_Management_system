@@ -132,6 +132,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+  deletePost: (id) => request(`/posts/${id}`, { method: 'DELETE' }),
 
   // Officers
   getOfficers: () => request('/officers'),
@@ -152,6 +153,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+  deleteShift: (id) => request(`/shifts/${id}`, { method: 'DELETE' }),
 
   // Assignments
   getAssignments: () => request('/assignments'),

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, Plus } from 'lucide-react';
+import { Clock, Plus, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function ShiftsView() {
@@ -30,6 +30,20 @@ export default function ShiftsView() {
   useEffect(() => {
     loadShifts();
   }, []);
+
+  const handleDeleteShift = async (id, shiftName) => {
+    if (!window.confirm(`Are you sure you want to delete shift "${shiftName}"?`)) return;
+    try {
+      const res = await api.deleteShift(id);
+      if (res.success) {
+        loadShifts();
+      } else {
+        alert(res.message || 'Delete failed.');
+      }
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
+  };
 
   const handleCreateShift = async (e) => {
     e.preventDefault();
@@ -80,9 +94,18 @@ export default function ShiftsView() {
             <div key={s.id} className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 space-y-3 shadow-lg">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-white">{s.name}</h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Grace: {s.grace_period_minutes}m
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    Grace: {s.grace_period_minutes}m
+                  </span>
+                  <button
+                    onClick={() => handleDeleteShift(s.id, s.name)}
+                    title="Delete Shift"
+                    className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 text-xs space-y-1.5">
