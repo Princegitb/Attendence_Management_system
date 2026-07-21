@@ -36,7 +36,7 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
 
   const getFullImageUrl = (path) => {
     if (!path) return null;
-    if (path.startsWith('http')) return path;
+    if (path.startsWith('http') || path.startsWith('data:')) return path;
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const serverOrigin = API_BASE.replace(/\/api\/?$/, '');
     return `${serverOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
@@ -230,20 +230,24 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              disabled={actionLoading}
-              onClick={() => promptStatusConfirmation('APPROVED', 'Approved by Manager from details modal')}
-              className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              <CheckCircle2 className="w-4 h-4" /> Approve
-            </button>
-            <button
-              disabled={actionLoading}
-              onClick={() => promptStatusConfirmation('REJECTED', 'Rejected by Manager after photo/location review')}
-              className="px-3.5 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              <XCircle className="w-4 h-4" /> Reject
-            </button>
+            {record.status === 'PENDING_REVIEW' && (
+              <button
+                disabled={actionLoading}
+                onClick={() => promptStatusConfirmation('APPROVED', 'Approved by Manager from details modal')}
+                className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Approve
+              </button>
+            )}
+            {record.status !== 'REJECTED' && (
+              <button
+                disabled={actionLoading}
+                onClick={() => promptStatusConfirmation('REJECTED', 'Rejected by Manager after photo/location review')}
+                className="px-3.5 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <XCircle className="w-4 h-4" /> Reject
+              </button>
+            )}
             <button
               onClick={() => onCorrect(record)}
               className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold transition-colors"

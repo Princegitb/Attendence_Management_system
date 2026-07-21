@@ -275,7 +275,7 @@ async function markCheckOut(req, res) {
 
     // 1. Check existing check-in attendance
     const existingAtt = await db.query(
-      `SELECT id, check_in_time, check_out_time FROM attendance WHERE guard_id = $1 AND date = $2`,
+      `SELECT id, check_in_time, check_out_time, status FROM attendance WHERE guard_id = $1 AND date = $2`,
       [guard_id, today]
     );
 
@@ -326,14 +326,19 @@ async function markCheckOut(req, res) {
     // 5. Upload photo
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 6. Update attendance record with check-out data
+    // 6. Preserve PENDING_REVIEW or REJECTED status if present, otherwise set CHECKED_OUT
+    const currentStatus = existingAtt.rows[0].status;
+    const newStatus = (currentStatus === 'PENDING_REVIEW' || currentStatus === 'REJECTED')
+      ? currentStatus
+      : 'CHECKED_OUT';
+
     const updateRes = await db.query(
       `UPDATE attendance
        SET check_out_time = $1, check_out_latitude = $2, check_out_longitude = $3, 
-           check_out_photo_url = $4, status = 'CHECKED_OUT'
-       WHERE id = $5
+           check_out_photo_url = $4, status = $5
+       WHERE id = $6
        RETURNING id, check_out_time, status`,
-      [serverTimestamp, latitude, longitude, uploadResult.url, existingAtt.rows[0].id]
+      [serverTimestamp, latitude, longitude, uploadResult.url, newStatus, existingAtt.rows[0].id]
     );
 
     await logAuditEvent({

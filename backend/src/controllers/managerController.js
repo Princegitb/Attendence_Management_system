@@ -441,9 +441,14 @@ async function correctAttendance(req, res) {
       return res.status(404).json({ success: false, message: 'Attendance record not found.' });
     }
 
+    let finalStatus = status;
+    if (status === 'APPROVED' && oldAtt.rows[0].check_out_time) {
+      finalStatus = 'CHECKED_OUT';
+    }
+
     const updatedRes = await db.query(
       `UPDATE attendance SET status = $1 WHERE id = $2 RETURNING *`,
-      [status, id]
+      [finalStatus, id]
     );
 
     await logAuditEvent({
