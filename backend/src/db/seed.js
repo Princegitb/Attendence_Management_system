@@ -11,18 +11,21 @@ async function seedDb() {
     const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'adminpassword';
     const mgrPasswordHash = await bcrypt.hash(adminPassword, 10);
 
-    await db.query(
-      `INSERT INTO managers (name, mobile, password_hash, role)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (mobile) DO NOTHING`,
-      ['Super Admin Manager', adminMobile, mgrPasswordHash, 'MANAGER']
-    );
+    // Check if initial admin already exists
+    const existingAdmin = await db.query(`SELECT id FROM managers WHERE mobile = $1`, [adminMobile]);
+    const isFirstTimeInit = !existingAdmin.rows || existingAdmin.rows.length === 0;
 
-    console.log(`✅ Production Initial Super Admin ready. (Mobile: ${adminMobile})`);
+    if (isFirstTimeInit) {
+      await db.query(
+        `INSERT INTO managers (name, mobile, password_hash, role)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (mobile) DO NOTHING`,
+        ['Super Admin Manager', adminMobile, mgrPasswordHash, 'MANAGER']
+      );
 
-    // Seed default sample posts if not present
-    const existingPosts = await db.query(`SELECT id FROM posts LIMIT 1`);
-    if (!existingPosts.rows || existingPosts.rows.length === 0) {
+      console.log(`✅ Production Initial Super Admin ready. (Mobile: ${adminMobile})`);
+
+      // Seed default sample posts ONLY on first-time initialization
       await db.query(
         `INSERT INTO posts (name, address, latitude, longitude, allowed_radius_metres) VALUES ($1, $2, $3, $4, $5)`,
         ['Main Gate - HQ', 'Central Business District, New Delhi', 28.613939, 77.209021, 100]
@@ -32,11 +35,8 @@ async function seedDb() {
         ['Warehouse North', 'Industrial Area Phase 2, New Delhi', 28.650000, 77.220000, 150]
       );
       console.log('✅ Default sample posts seeded.');
-    }
 
-    // Seed default sample shifts if not present
-    const existingShifts = await db.query(`SELECT id FROM shifts LIMIT 1`);
-    if (!existingShifts.rows || existingShifts.rows.length === 0) {
+      // Seed default sample shifts ONLY on first-time initialization
       await db.query(
         `INSERT INTO shifts (name, start_time, end_time, grace_period_minutes) VALUES ($1, $2, $3, $4)`,
         ['Day Shift', '08:00:00', '16:00:00', 15]
@@ -46,6 +46,8 @@ async function seedDb() {
         ['Night Shift', '20:00:00', '04:00:00', 15]
       );
       console.log('✅ Default sample shifts seeded.');
+    } else {
+      console.log('ℹ️ System already initialized. Skipping default shifts and posts seeding.');
     }
   } catch (err) {
     console.error('Error seeding initial system data:', err.message);
