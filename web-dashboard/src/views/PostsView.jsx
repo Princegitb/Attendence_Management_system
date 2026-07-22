@@ -85,12 +85,17 @@ export default function PostsView() {
       return;
     }
 
+    const payload = {
+      ...formData,
+      allowed_radius_metres: parseInt(formData.allowed_radius_metres) || 100
+    };
+
     try {
       let res;
       if (editingPost) {
-        res = await api.updatePost(editingPost.id, formData);
+        res = await api.updatePost(editingPost.id, payload);
       } else {
-        res = await api.createPost(formData);
+        res = await api.createPost(payload);
       }
 
       if (res.success) {
@@ -197,15 +202,15 @@ export default function PostsView() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Allowed Radius (Meters)</label>
-                  <input
-                    type="number"
-                    value={formData.allowed_radius_metres}
-                    onChange={(e) => setFormData({ ...formData, allowed_radius_metres: parseInt(e.target.value) || 100 })}
-                    placeholder="e.g. 100"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
-                  />
-                </div>
+                   <label className="block text-xs font-semibold text-slate-300 mb-1">Allowed Radius (Meters)</label>
+                   <input
+                     type="number"
+                     value={formData.allowed_radius_metres}
+                     onChange={(e) => setFormData({ ...formData, allowed_radius_metres: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                     placeholder="e.g. 100"
+                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                   />
+                 </div>
               </div>
 
               <div>

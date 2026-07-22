@@ -52,8 +52,13 @@ export default function ShiftsView() {
       return;
     }
 
+    const payload = {
+      ...formData,
+      grace_period_minutes: parseInt(formData.grace_period_minutes) || 15
+    };
+
     try {
-      const res = await api.createShift(formData);
+      const res = await api.createShift(payload);
       if (res.success) {
         setShowModal(false);
         setFormData({ name: '', start_time: '08:00', end_time: '16:00', grace_period_minutes: 15 });
@@ -168,7 +173,7 @@ export default function ShiftsView() {
                 <input
                   type="number"
                   value={formData.grace_period_minutes}
-                  onChange={(e) => setFormData({ ...formData, grace_period_minutes: parseInt(e.target.value) || 15 })}
+                  onChange={(e) => setFormData({ ...formData, grace_period_minutes: e.target.value === '' ? '' : parseInt(e.target.value) })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
