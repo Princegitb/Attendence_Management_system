@@ -134,7 +134,7 @@ function simulateQuery(text, params) {
 
     if (lowerSql.includes('from guards g') || lowerSql.includes('join officer_assignments')) {
       const officerId = params[0];
-      const today = params[1] || new Date().toISOString().split('T')[0];
+      const today = params[1] || new Intl.DateTimeFormat('en-CA', { timeZone: process.env.SYSTEM_TIMEZONE || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
       const rows = inMemoryTables.guards.map(g => {
         const post = inMemoryTables.posts.find(p => String(p.id) === String(g.assigned_post_id)) || {

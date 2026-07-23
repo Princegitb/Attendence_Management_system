@@ -4,13 +4,20 @@ const { validatePhotoBuffer } = require('../utils/photoValidator');
 const { uploadPhoto } = require('../utils/storage');
 const { logAuditEvent } = require('../utils/auditLogger');
 
+const TIMEZONE = process.env.SYSTEM_TIMEZONE || 'Asia/Kolkata';
+
+const getLocalDateString = (dateObj = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return formatter.format(dateObj);
+};
+
 /**
  * Get assigned guards checklist for logged-in Field Officer for today
  */
 async function getOfficerGuardsChecklist(req, res) {
   try {
     const officerId = req.user.id;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
 
     // Fetch guards assigned directly to officer or assigned via post
     const queryStr = `
@@ -124,7 +131,7 @@ async function markCheckIn(req, res) {
       });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     const serverTimestamp = new Date();
 
     // 1. Idempotency Check: Verify if attendance already exists for today
@@ -184,14 +191,23 @@ async function markCheckIn(req, res) {
     let statusMessage = `Check-in recorded and automatically approved for ${guard.name} (On Time / Grace Period).`;
 
     if (guard.start_time) {
-      const [shHours, shMinutes] = guard.start_time.split(':').map(Number);
-      const shiftStartTime = new Date(serverTimestamp);
-      shiftStartTime.setHours(shHours, shMinutes, 0, 0);
+      // Format current server time into the local system timezone (e.g. "10:17:44")
+      const localTimeStr = serverTimestamp.toLocaleTimeString('en-US', {
+        timeZone: TIMEZONE,
+        hour12: false,
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric'
+      });
 
+      const [currH, currM] = localTimeStr.split(':').map(Number);
+      const [shiftH, shiftM] = guard.start_time.split(':').map(Number);
+
+      const currentTotalMinutes = currH * 60 + currM;
+      const shiftTotalMinutes = shiftH * 60 + shiftM;
       const graceMinutes = parseInt(guard.grace_period_minutes || 15);
-      const cutoffTime = new Date(shiftStartTime.getTime() + graceMinutes * 60 * 1000);
 
-      if (serverTimestamp > cutoffTime) {
+      if (currentTotalMinutes > (shiftTotalMinutes + graceMinutes)) {
         initialStatus = 'PENDING_REVIEW';
         statusMessage = `Check-in submitted for ${guard.name} (Late check-in). Kept for Manager review.`;
       }
@@ -270,7 +286,7 @@ async function markCheckOut(req, res) {
       });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     const serverTimestamp = new Date();
 
     // 1. Check existing check-in attendance

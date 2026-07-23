@@ -3,6 +3,13 @@ const db = require('../db');
 const { generateTemplateBuffer, processGuardExcelImport } = require('../utils/excelParser');
 const { logAuditEvent } = require('../utils/auditLogger');
 
+const TIMEZONE = process.env.SYSTEM_TIMEZONE || 'Asia/Kolkata';
+
+const getLocalDateString = (dateObj = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return formatter.format(dateObj);
+};
+
 // ==========================================
 // 1. GUARD MANAGEMENT
 // ==========================================
@@ -431,7 +438,7 @@ async function deleteAssignment(req, res) {
 async function getAttendanceLogs(req, res) {
   try {
     const { date, officer_id, post_id, status } = req.query;
-    const filterDate = date || new Date().toISOString().split('T')[0];
+    const filterDate = date || getLocalDateString();
 
     let queryStr = `
       SELECT a.id, a.guard_id, g.name AS guard_name, g.mobile AS guard_mobile,
