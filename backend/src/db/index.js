@@ -254,6 +254,29 @@ function simulateQuery(text, params) {
         res = res.filter(a => String(a.guard_id) === String(params[0]) && a.date === params[1]);
       } else if (lowerSql.includes('where a.date = $1') || lowerSql.includes('where date = $1')) {
         res = res.filter(a => a.date === params[0]);
+        let paramIdx = 1;
+        if (lowerSql.includes('and a.marked_by_officer_id =')) {
+          const val = params[paramIdx++];
+          res = res.filter(a => String(a.marked_by_officer_id) === String(val));
+        }
+        if (lowerSql.includes('and g.assigned_post_id =')) {
+          const val = params[paramIdx++];
+          res = res.filter(a => {
+            const guard = inMemoryTables.guards.find(g => String(g.id) === String(a.guard_id));
+            return guard && String(guard.assigned_post_id) === String(val);
+          });
+        }
+        if (lowerSql.includes('and a.status =')) {
+          const val = params[paramIdx++];
+          res = res.filter(a => String(a.status) === String(val));
+        }
+        if (lowerSql.includes('and g.assigned_shift_id =')) {
+          const val = params[paramIdx++];
+          res = res.filter(a => {
+            const guard = inMemoryTables.guards.find(g => String(g.id) === String(a.guard_id));
+            return guard && String(guard.assigned_shift_id) === String(val);
+          });
+        }
       } else if (lowerSql.includes('where id = $1')) {
         res = res.filter(a => String(a.id) === String(params[0]));
       }

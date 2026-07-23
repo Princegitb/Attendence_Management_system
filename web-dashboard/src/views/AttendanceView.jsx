@@ -26,10 +26,12 @@ export default function AttendanceView() {
   const [officerId, setOfficerId] = useState('');
   const [postId, setPostId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('');
 
   const [attendance, setAttendance] = useState([]);
   const [officers, setOfficers] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [shifts, setShifts] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -41,15 +43,17 @@ export default function AttendanceView() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [attRes, offRes, postRes] = await Promise.all([
-        api.getAttendance(date, officerId, postId, statusFilter),
+      const [attRes, offRes, postRes, shiftRes] = await Promise.all([
+        api.getAttendance(date, officerId, postId, statusFilter, shiftFilter),
         api.getOfficers(),
-        api.getPosts()
+        api.getPosts(),
+        api.getShifts()
       ]);
 
       if (attRes.success) setAttendance(attRes.data || []);
       if (offRes.success) setOfficers(offRes.data || []);
       if (postRes.success) setPosts(postRes.data || []);
+      if (shiftRes.success) setShifts(shiftRes.data || []);
     } catch (err) {
       console.error('Failed to load attendance:', err);
     } finally {
@@ -59,7 +63,7 @@ export default function AttendanceView() {
 
   useEffect(() => {
     loadData();
-  }, [date, officerId, postId, statusFilter]);
+  }, [date, officerId, postId, statusFilter, shiftFilter]);
 
   const handleCorrectionSubmit = async (id, status, reason) => {
     const res = await api.correctAttendance(id, status, reason);
@@ -136,7 +140,7 @@ export default function AttendanceView() {
       )}
 
       {/* Filters Bar */}
-      <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Date Filter</label>
           <input
@@ -171,6 +175,20 @@ export default function AttendanceView() {
             <option value="">All Posts</option>
             {posts.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Work Shift</label>
+          <select
+            value={shiftFilter}
+            onChange={(e) => setShiftFilter(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
+          >
+            <option value="">All Shifts</option>
+            {shifts.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>

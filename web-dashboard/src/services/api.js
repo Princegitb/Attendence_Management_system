@@ -85,11 +85,12 @@ async function request(endpoint, options = {}, isRetry = false) {
 
 export const api = {
   // Attendance
-  getAttendance: (date, officerId, postId, status) => {
+  getAttendance: (date, officerId, postId, status, shiftId) => {
     let url = `/attendance?date=${date || ''}`;
     if (officerId) url += `&officer_id=${officerId}`;
     if (postId) url += `&post_id=${postId}`;
     if (status) url += `&status=${status}`;
+    if (shiftId) url += `&shift_id=${shiftId}`;
     return request(url);
   },
   correctAttendance: (id, status, reason) => request(`/attendance/${id}/correction`, {

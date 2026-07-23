@@ -17,6 +17,10 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   String? _error;
   String _filter = 'CHECK_IN';
 
+  String _searchQuery = '';
+  String _selectedPostName = 'All Posts';
+  String _selectedShiftName = 'All Shifts';
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +58,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
+  List<String> get _uniquePosts {
+    final names = _guards.map((g) => g.post.name).where((name) => name.isNotEmpty).toSet().toList();
+    names.sort();
+    return ['All Posts', ...names];
+  }
+
+  List<String> get _uniqueShifts {
+    final names = _guards.map((g) => g.shift.name).where((name) => name.isNotEmpty).toSet().toList();
+    names.sort();
+    return ['All Shifts', ...names];
+  }
+
   List<GuardModel> get _checkInGuards {
     return _guards.where((g) => g.checkInTime == null && g.attendanceStatus == 'PENDING').toList();
   }
@@ -67,12 +83,26 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   List<GuardModel> get _filteredGuards {
+    List<GuardModel> list = [];
     if (_filter == 'CHECK_OUT') {
-      return _checkOutGuards;
+      list = _checkOutGuards;
     } else if (_filter == 'COMPLETED') {
-      return _completedGuards;
+      list = _completedGuards;
+    } else {
+      list = _checkInGuards;
     }
-    return _checkInGuards;
+
+    if (_searchQuery.isNotEmpty) {
+      list = list.where((g) => g.guardName.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    }
+    if (_selectedPostName != 'All Posts') {
+      list = list.where((g) => g.post.name == _selectedPostName).toList();
+    }
+    if (_selectedShiftName != 'All Shifts') {
+      list = list.where((g) => g.shift.name == _selectedShiftName).toList();
+    }
+
+    return list;
   }
 
   @override
@@ -114,6 +144,113 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   _buildFilterChip('COMPLETED', 'Completed (${_completedGuards.length})'),
                 ],
               ),
+            ),
+          ),
+
+          // Search & Dropdown Filter Panel
+          Container(
+            color: const Color(0xFF1E293B),
+            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+            child: Column(
+              children: [
+                // Search Bar
+                TextField(
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val);
+                  },
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search guard by name...',
+                    hintStyle: const TextStyle(color: slate400, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF0284C7), size: 20),
+                    isDense: true,
+                    filled: true,
+                    fillColor: const Color(0xFF0F172A),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF334155)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF0284C7)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Dropdowns
+                Row(
+                  children: [
+                    // Post Dropdown
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _uniquePosts.contains(_selectedPostName) ? _selectedPostName : 'All Posts',
+                        onChanged: (val) {
+                          setState(() => _selectedPostName = val ?? 'All Posts');
+                        },
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        dropdownColor: const Color(0xFF1E293B),
+                        decoration: InputDecoration(
+                          labelText: 'Post Location',
+                          labelStyle: const TextStyle(color: slate400, fontSize: 11),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                          filled: true,
+                          fillColor: const Color(0xFF0F172A),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                        ),
+                        items: _uniquePosts.map((name) => DropdownMenuItem(
+                          value: name,
+                          child: Text(name, overflow: TextOverflow.ellipsis),
+                        )).toList(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Shift Dropdown
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _uniqueShifts.contains(_selectedShiftName) ? _selectedShiftName : 'All Shifts',
+                        onChanged: (val) {
+                          setState(() => _selectedShiftName = val ?? 'All Shifts');
+                        },
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        dropdownColor: const Color(0xFF1E293B),
+                        decoration: InputDecoration(
+                          labelText: 'Shift',
+                          labelStyle: const TextStyle(color: slate400, fontSize: 11),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                          filled: true,
+                          fillColor: const Color(0xFF0F172A),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF334155)),
+                          ),
+                        ),
+                        items: _uniqueShifts.map((name) => DropdownMenuItem(
+                          value: name,
+                          child: Text(name, overflow: TextOverflow.ellipsis),
+                        )).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 

@@ -437,7 +437,7 @@ async function deleteAssignment(req, res) {
 // ==========================================
 async function getAttendanceLogs(req, res) {
   try {
-    const { date, officer_id, post_id, status } = req.query;
+    const { date, officer_id, post_id, status, shift_id } = req.query;
     const filterDate = date || getLocalDateString();
 
     let queryStr = `
@@ -470,6 +470,10 @@ async function getAttendanceLogs(req, res) {
     if (status) {
       params.push(status);
       queryStr += ` AND a.status = $${params.length}`;
+    }
+    if (shift_id) {
+      params.push(shift_id);
+      queryStr += ` AND g.assigned_shift_id = $${params.length}`;
     }
 
     queryStr += ` ORDER BY a.id DESC`;
