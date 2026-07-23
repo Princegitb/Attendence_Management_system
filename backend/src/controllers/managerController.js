@@ -113,6 +113,72 @@ async function deleteGuard(req, res) {
   }
 }
 
+async function bulkDeleteGuards(req, res) {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'No guard IDs provided.' });
+    }
+
+    await db.query(`DELETE FROM guards WHERE id = ANY($1::int[])`, [ids.map(Number)]);
+
+    await logAuditEvent({
+      action: 'BULK_DELETE_GUARDS',
+      performedBy: req.user.name,
+      performedByRole: 'MANAGER',
+      targetType: 'Guards',
+      reason: `Guards [${ids.join(', ')}] bulk deleted by Manager`
+    });
+
+    return res.json({ success: true, message: `${ids.length} guards deleted successfully.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+async function bulkUpdateGuards(req, res) {
+  try {
+    const { ids, assigned_post_id, assigned_shift_id } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'No guard IDs provided.' });
+    }
+
+    let queryStr = 'UPDATE guards SET ';
+    const updates = [];
+    const params = [];
+
+    if (assigned_post_id !== undefined) {
+      params.push(assigned_post_id ? Number(assigned_post_id) : null);
+      updates.push(`assigned_post_id = $${params.length}`);
+    }
+    if (assigned_shift_id !== undefined) {
+      params.push(assigned_shift_id ? Number(assigned_shift_id) : null);
+      updates.push(`assigned_shift_id = $${params.length}`);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields to update provided.' });
+    }
+
+    params.push(ids.map(Number));
+    queryStr += updates.join(', ') + ` WHERE id = ANY($${params.length}::int[]) RETURNING *`;
+
+    await db.query(queryStr, params);
+
+    await logAuditEvent({
+      action: 'BULK_UPDATE_GUARDS',
+      performedBy: req.user.name,
+      performedByRole: 'MANAGER',
+      targetType: 'Guards',
+      reason: `Guards [${ids.join(', ')}] updated (post: ${assigned_post_id}, shift: ${assigned_shift_id}) by Manager`
+    });
+
+    return res.json({ success: true, message: `${ids.length} guards updated successfully.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 // ==========================================
 // 2. FIELD OFFICER MANAGEMENT
 // ==========================================
@@ -628,6 +694,8 @@ module.exports = {
   createGuard,
   updateGuard,
   deleteGuard,
+  bulkDeleteGuards,
+  bulkUpdateGuards,
   getOfficers,
   createOfficer,
   resetOfficerPassword,

@@ -112,6 +112,16 @@ export const api = {
     body: JSON.stringify(data)
   }),
   deleteGuard: (id) => request(`/guards/${id}`, { method: 'DELETE' }),
+  deleteGuardsBulk: (ids) => request('/guards/bulk', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids })
+  }),
+  updateGuardsBulk: (ids, data) => request('/guards/bulk', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, ...data })
+  }),
   importGuardsBulk: async (file) => {
     const formData = new FormData();
     formData.append('file', file);

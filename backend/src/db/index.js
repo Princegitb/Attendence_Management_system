@@ -436,6 +436,41 @@ function simulateQuery(text, params) {
         }
       }
     }
+    if (lowerSql.includes('guards')) {
+      let targetIds = [];
+      const arrayParam = params.find(p => Array.isArray(p));
+      if (arrayParam) {
+        targetIds = arrayParam.map(String);
+      } else {
+        targetIds = [String(params[params.length - 1])];
+      }
+
+      const setClauseIdx = sql.toLowerCase().indexOf('set');
+      const whereClauseIdx = sql.toLowerCase().indexOf('where');
+      if (setClauseIdx !== -1 && whereClauseIdx !== -1) {
+        const setClause = sql.substring(setClauseIdx + 3, whereClauseIdx).trim();
+        const parts = setClause.split(',').map(p => p.trim());
+        
+        const updatedRows = [];
+        inMemoryTables.guards = inMemoryTables.guards.map(g => {
+          if (targetIds.includes(String(g.id))) {
+            const updated = { ...g };
+            parts.forEach(part => {
+              const [field, placeholder] = part.split('=').map(x => x.trim());
+              const cleanField = field.replace(/^g\./, ''); // remove table prefix if any
+              const paramIdx = parseInt(placeholder.replace('$', '')) - 1;
+              if (!isNaN(paramIdx) && paramIdx >= 0 && paramIdx < params.length) {
+                updated[cleanField] = params[paramIdx];
+              }
+            });
+            updatedRows.push(updated);
+            return updated;
+          }
+          return g;
+        });
+        return { rows: updatedRows, rowCount: updatedRows.length };
+      }
+    }
     if (lowerSql.includes('attendance')) {
       const item = inMemoryTables.attendance.find(a => String(a.id) === String(params[params.length - 1]));
       if (item) {
@@ -463,7 +498,8 @@ function simulateQuery(text, params) {
     }
     if (lowerSql.includes('guards')) {
       const initialLen = inMemoryTables.guards.length;
-      inMemoryTables.guards = inMemoryTables.guards.filter(g => String(g.id) !== String(params[0]));
+      const targetIds = Array.isArray(params[0]) ? params[0].map(String) : [String(params[0])];
+      inMemoryTables.guards = inMemoryTables.guards.filter(g => !targetIds.includes(String(g.id)));
       const deletedCount = initialLen - inMemoryTables.guards.length;
       return { rows: [], rowCount: deletedCount };
     }

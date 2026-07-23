@@ -9,6 +9,8 @@ const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 // Manager-only Guard routes
 router.get('/', authenticateToken, requireRole('MANAGER'), managerController.getGuards);
 router.post('/', authenticateToken, requireRole('MANAGER'), managerController.createGuard);
+router.delete('/bulk', authenticateToken, requireRole('MANAGER'), managerController.bulkDeleteGuards);
+router.put('/bulk', authenticateToken, requireRole('MANAGER'), managerController.bulkUpdateGuards);
 router.put('/:id', authenticateToken, requireRole('MANAGER'), managerController.updateGuard);
 router.delete('/:id', authenticateToken, requireRole('MANAGER'), managerController.deleteGuard);
 
