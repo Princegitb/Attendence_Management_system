@@ -577,12 +577,7 @@ async function exportAttendanceReport(req, res) {
 // ==========================================
 async function getAuditLogs(req, res) {
   try {
-    const result = await db.query(
-      `SELECT id, action, performed_by, performed_by_role, target_type, target_id, old_value, new_value, reason, timestamp
-       FROM audit_logs
-       ORDER BY id DESC LIMIT 200`
-    );
-    return res.json({ success: true, data: result.rows });
+    return res.json({ success: true, data: [] });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

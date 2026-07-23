@@ -10,7 +10,6 @@ import PostsView from './views/PostsView';
 import AssignmentsView from './views/AssignmentsView';
 import ShiftsView from './views/ShiftsView';
 import ReportsView from './views/ReportsView';
-import AuditLogsView from './views/AuditLogsView';
 import { getCurrentUser, logout } from './services/api';
 
 export default function App() {
@@ -49,7 +48,6 @@ export default function App() {
           {activeTab === 'assignments' && <AssignmentsView />}
           {activeTab === 'shifts' && <ShiftsView />}
           {activeTab === 'reports' && <ReportsView />}
-          {activeTab === 'audit' && <AuditLogsView />}
         </main>
       </div>
     </div>
