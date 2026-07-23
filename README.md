@@ -21,6 +21,7 @@ A production-grade, end-to-end workforce management and attendance verification 
 - **Live Real-Time Overview**: Live counters for total guards, present count, absent/pending count, and geo-fence violation alerts.
 - **Interactive Geo-Fence Location Picker**: Fast geocoding search bar + 1-click GPS detector to set post coordinates and radius.
 - **Bulk Guard Roster Import (Excel)**: Upload 100+ guards in seconds using Excel (`.xlsx`) templates with full automated validation.
+- **Enhanced Guard Roster & Bulk Operations**: Supports multiselecting guards to delete them in bulk or reassign their post/shift simultaneously. Includes a quick pencil-edit modal for individual guard detail adjustments (Name, Mobile, Post, Shift, Status).
 - **Audit Logs & Auditability**: Immutable log tracking of all manager edits, manual attendance corrections, and officer creations.
 - **Manual Attendance Correction Engine**: Allows managers to correct attendance with mandatory detailed audit reasons.
 - **1-Click CSV Attendance Reports**: Download formatted attendance reports filterable by date range.
