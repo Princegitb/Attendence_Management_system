@@ -11,13 +11,64 @@ const getLocalDateString = (dateObj = new Date()) => {
   return formatter.format(dateObj);
 };
 
+const getLogicalShiftDate = (guard, serverTimestamp = new Date()) => {
+  const localDateStr = getLocalDateString(serverTimestamp);
+  if (!guard || !guard.start_time || !guard.end_time) {
+    return localDateStr;
+  }
+
+  const localTimeStr = serverTimestamp.toLocaleTimeString('en-US', {
+    timeZone: TIMEZONE,
+    hour12: false,
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric'
+  });
+
+  const [shStartH, shStartM] = guard.start_time.split(':').map(Number);
+  const [shEndH, shEndM] = guard.end_time.split(':').map(Number);
+  const [currH, currM] = localTimeStr.split(':').map(Number);
+
+  const startMin = shStartH * 60 + shStartM;
+  const endMin = shEndH * 60 + shEndM;
+  const currMin = currH * 60 + currM;
+
+  const isOvernight = endMin < startMin;
+
+  if (isOvernight) {
+    const checkoutBufferMinutes = 240; // 4 hours checkout buffer after shift ends
+    if (currMin <= (endMin + checkoutBufferMinutes)) {
+      const yesterday = new Date(serverTimestamp);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return getLocalDateString(yesterday);
+    }
+  }
+
+  return localDateStr;
+};
+
 /**
  * Get assigned guards checklist for logged-in Field Officer for today
  */
 async function getOfficerGuardsChecklist(req, res) {
   try {
     const officerId = req.user.id;
-    const today = getLocalDateString();
+    const serverTimestamp = new Date();
+    const today = getLocalDateString(serverTimestamp);
+
+    const yesterdayDateObj = new Date(serverTimestamp);
+    yesterdayDateObj.setDate(yesterdayDateObj.getDate() - 1);
+    const yesterday = getLocalDateString(yesterdayDateObj);
+
+    const localTimeStr = serverTimestamp.toLocaleTimeString('en-US', {
+      timeZone: TIMEZONE,
+      hour12: false,
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric'
+    });
+    const [currH, currM] = localTimeStr.split(':').map(Number);
+    const currMin = currH * 60 + currM;
 
     // Fetch guards assigned directly to officer or assigned via post
     const queryStr = `
@@ -47,7 +98,15 @@ async function getOfficerGuardsChecklist(req, res) {
       JOIN posts p ON g.assigned_post_id = p.id
       LEFT JOIN shifts s ON g.assigned_shift_id = s.id
       JOIN officer_assignments oa ON (oa.guard_id = g.id OR oa.post_id = g.assigned_post_id)
-      LEFT JOIN attendance a ON (a.guard_id = g.id AND a.date = $2)
+      LEFT JOIN attendance a ON (
+        a.guard_id = g.id AND a.date = (
+          CASE 
+            WHEN s.end_time < s.start_time AND $4 <= (EXTRACT(HOUR FROM s.end_time) * 60 + EXTRACT(MINUTE FROM s.end_time) + 240)
+            THEN $3::DATE
+            ELSE $2::DATE
+          END
+        )
+      )
       WHERE oa.officer_id = $1
         AND (oa.from_date IS NULL OR oa.from_date <= $2)
         AND (oa.to_date IS NULL OR oa.to_date >= $2)
@@ -55,7 +114,7 @@ async function getOfficerGuardsChecklist(req, res) {
       ORDER BY g.name ASC;
     `;
 
-    const result = await db.query(queryStr, [officerId, today]);
+    const result = await db.query(queryStr, [officerId, today, yesterday, currMin]);
 
     const guardsList = result.rows.map(row => {
       let status = 'PENDING';
@@ -131,23 +190,9 @@ async function markCheckIn(req, res) {
       });
     }
 
-    const today = getLocalDateString();
     const serverTimestamp = new Date();
 
-    // 1. Idempotency Check: Verify if attendance already exists for today
-    const existingAtt = await db.query(
-      `SELECT id, check_in_time FROM attendance WHERE guard_id = $1 AND date = $2`,
-      [guard_id, today]
-    );
-
-    if (existingAtt.rows.length > 0 && existingAtt.rows[0].check_in_time) {
-      return res.status(409).json({
-        success: false,
-        message: 'Check-in has already been marked for this guard today.'
-      });
-    }
-
-    // 2. Fetch Guard, Assigned Post & Assigned Shift
+    // 1. Fetch Guard, Assigned Post & Assigned Shift
     const guardRes = await db.query(
       `SELECT g.id, g.name, p.id AS post_id, p.name AS post_name, p.latitude AS post_lat, p.longitude AS post_lon, p.allowed_radius_metres,
               s.id AS shift_id, s.name AS shift_name, s.start_time, s.end_time, s.grace_period_minutes
@@ -163,6 +208,22 @@ async function markCheckIn(req, res) {
     }
 
     const guard = guardRes.rows[0];
+
+    // 2. Compute Logical Shift Date
+    const today = getLogicalShiftDate(guard, serverTimestamp);
+
+    // 3. Idempotency Check: Verify if attendance already exists for the logical date
+    const existingAtt = await db.query(
+      `SELECT id, check_in_time FROM attendance WHERE guard_id = $1 AND date = $2`,
+      [guard_id, today]
+    );
+
+    if (existingAtt.rows.length > 0 && existingAtt.rows[0].check_in_time) {
+      return res.status(409).json({
+        success: false,
+        message: 'Check-in has already been marked for this guard today.'
+      });
+    }
     const postLat = parseFloat(guard.post_lat !== undefined ? guard.post_lat : guard.post_latitude);
     const postLon = parseFloat(guard.post_lon !== undefined ? guard.post_lon : guard.post_longitude);
     const allowedRadius = parseInt(guard.allowed_radius_metres || 100);
@@ -286,10 +347,29 @@ async function markCheckOut(req, res) {
       });
     }
 
-    const today = getLocalDateString();
     const serverTimestamp = new Date();
 
-    // 1. Check existing check-in attendance
+    // 1. Fetch Guard, Assigned Post & Assigned Shift
+    const guardRes = await db.query(
+      `SELECT g.id, g.name, p.id AS post_id, p.name AS post_name, p.latitude AS post_lat, p.longitude AS post_lon, p.allowed_radius_metres,
+              s.id AS shift_id, s.name AS shift_name, s.start_time, s.end_time
+       FROM guards g
+       JOIN posts p ON g.assigned_post_id = p.id
+       LEFT JOIN shifts s ON g.assigned_shift_id = s.id
+       WHERE g.id = $1`,
+      [guard_id]
+    );
+
+    if (guardRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Guard or assigned post not found.' });
+    }
+
+    const guard = guardRes.rows[0];
+
+    // 2. Compute Logical Shift Date
+    const today = getLogicalShiftDate(guard, serverTimestamp);
+
+    // 3. Check existing check-in attendance for the logical date
     const existingAtt = await db.query(
       `SELECT id, check_in_time, check_out_time, status FROM attendance WHERE guard_id = $1 AND date = $2`,
       [guard_id, today]
@@ -309,16 +389,6 @@ async function markCheckOut(req, res) {
       });
     }
 
-    // 2. Fetch Guard & Assigned Post
-    const guardRes = await db.query(
-      `SELECT g.id, g.name, p.id AS post_id, p.name AS post_name, p.latitude AS post_lat, p.longitude AS post_lon, p.allowed_radius_metres
-       FROM guards g
-       JOIN posts p ON g.assigned_post_id = p.id
-       WHERE g.id = $1`,
-      [guard_id]
-    );
-
-    const guard = guardRes.rows[0];
     const postLat = parseFloat(guard.post_lat);
     const postLon = parseFloat(guard.post_lon);
     const allowedRadius = parseInt(guard.allowed_radius_metres || 100);

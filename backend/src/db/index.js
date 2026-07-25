@@ -153,9 +153,27 @@ function simulateQuery(text, params) {
           end_time: '16:00:00'
         };
 
-        const att = inMemoryTables.attendance.find(a => String(a.guard_id) === String(g.id) && a.date === today);
+        let matchDate = today;
+        if (shift && shift.start_time && shift.end_time) {
+          const [shStartH, shStartM] = shift.start_time.split(':').map(Number);
+          const [shEndH, shEndM] = shift.end_time.split(':').map(Number);
+          const startMin = shStartH * 60 + shStartM;
+          const endMin = shEndH * 60 + shEndM;
+
+          const isOvernight = endMin < startMin;
+          if (isOvernight && params[2] && params[3] !== undefined) {
+            const currMin = Number(params[3]);
+            if (currMin <= (endMin + 240)) {
+              matchDate = params[2];
+            }
+          }
+        }
+
+        const att = inMemoryTables.attendance.find(a => String(a.guard_id) === String(g.id) && a.date === matchDate);
 
         return {
+          id: g.id,
+          name: g.name,
           guard_id: g.id,
           guard_name: g.name,
           guard_mobile: g.mobile,
@@ -165,6 +183,8 @@ function simulateQuery(text, params) {
           post_address: post.address,
           post_latitude: post.latitude,
           post_longitude: post.longitude,
+          post_lat: post.latitude,
+          post_lon: post.longitude,
           allowed_radius_metres: post.allowed_radius_metres,
           shift_id: shift.id,
           shift_name: shift.name,
@@ -235,8 +255,8 @@ function simulateQuery(text, params) {
     if (lowerSql.includes('from attendance')) {
       let res = inMemoryTables.attendance.map(a => {
         const guard = inMemoryTables.guards.find(g => String(g.id) === String(a.guard_id));
-        const post = inMemoryTables.posts.find(p => String(p.id) === String(g?.assigned_post_id));
-        const shift = inMemoryTables.shifts.find(s => String(s.id) === String(g?.assigned_shift_id)) || inMemoryTables.shifts[0];
+        const post = inMemoryTables.posts.find(p => String(p.id) === String(guard?.assigned_post_id));
+        const shift = inMemoryTables.shifts.find(s => String(s.id) === String(guard?.assigned_shift_id)) || inMemoryTables.shifts[0];
         const officer = inMemoryTables.field_officers.find(o => String(o.id) === String(a.marked_by_officer_id));
         return {
           ...a,
