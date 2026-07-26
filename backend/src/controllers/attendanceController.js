@@ -6,45 +6,70 @@ const { logAuditEvent } = require('../utils/auditLogger');
 
 const TIMEZONE = process.env.SYSTEM_TIMEZONE || 'Asia/Kolkata';
 
+const getLocalTimeDetails = (serverTimestamp = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(serverTimestamp);
+  const getPart = (type) => parts.find(p => p.type === type).value;
+
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+
+  let hour = parseInt(getPart('hour'), 10);
+  if (hour === 24) hour = 0;
+  const minute = parseInt(getPart('minute'), 10);
+  const second = parseInt(getPart('second'), 10);
+
+  const dateStr = `${year}-${month}-${day}`;
+  const totalMinutes = hour * 60 + minute;
+
+  return {
+    dateStr,
+    hour,
+    minute,
+    second,
+    totalMinutes
+  };
+};
+
 const getLocalDateString = (dateObj = new Date()) => {
-  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
-  return formatter.format(dateObj);
+  return getLocalTimeDetails(dateObj).dateStr;
 };
 
 const getLogicalShiftDate = (guard, serverTimestamp = new Date()) => {
-  const localDateStr = getLocalDateString(serverTimestamp);
+  const { dateStr, totalMinutes: currMin } = getLocalTimeDetails(serverTimestamp);
   if (!guard || !guard.start_time || !guard.end_time) {
-    return localDateStr;
+    return dateStr;
   }
-
-  const localTimeStr = serverTimestamp.toLocaleTimeString('en-US', {
-    timeZone: TIMEZONE,
-    hour12: false,
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric'
-  });
 
   const [shStartH, shStartM] = guard.start_time.split(':').map(Number);
   const [shEndH, shEndM] = guard.end_time.split(':').map(Number);
-  const [currH, currM] = localTimeStr.split(':').map(Number);
 
   const startMin = shStartH * 60 + shStartM;
   const endMin = shEndH * 60 + shEndM;
-  const currMin = currH * 60 + currM;
 
   const isOvernight = endMin < startMin;
 
   if (isOvernight) {
     const checkoutBufferMinutes = 240; // 4 hours checkout buffer after shift ends
     if (currMin <= (endMin + checkoutBufferMinutes)) {
-      const yesterday = new Date(serverTimestamp);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return getLocalDateString(yesterday);
+      const yesterdayObj = new Date(serverTimestamp);
+      yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+      return getLocalDateString(yesterdayObj);
     }
   }
 
-  return localDateStr;
+  return dateStr;
 };
 
 /**
@@ -54,21 +79,11 @@ async function getOfficerGuardsChecklist(req, res) {
   try {
     const officerId = req.user.id;
     const serverTimestamp = new Date();
-    const today = getLocalDateString(serverTimestamp);
+    const { dateStr: today, totalMinutes: currMin } = getLocalTimeDetails(serverTimestamp);
 
     const yesterdayDateObj = new Date(serverTimestamp);
     yesterdayDateObj.setDate(yesterdayDateObj.getDate() - 1);
     const yesterday = getLocalDateString(yesterdayDateObj);
-
-    const localTimeStr = serverTimestamp.toLocaleTimeString('en-US', {
-      timeZone: TIMEZONE,
-      hour12: false,
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric'
-    });
-    const [currH, currM] = localTimeStr.split(':').map(Number);
-    const currMin = currH * 60 + currM;
 
     // Fetch guards assigned directly to officer or assigned via post
     const queryStr = `
@@ -252,19 +267,8 @@ async function markCheckIn(req, res) {
     let statusMessage = `Check-in recorded and automatically approved for ${guard.name} (On Time / Grace Period).`;
 
     if (guard.start_time) {
-      // Format current server time into the local system timezone (e.g. "10:17:44")
-      const localTimeStr = serverTimestamp.toLocaleTimeString('en-US', {
-        timeZone: TIMEZONE,
-        hour12: false,
-        hour: 'numeric',
-        minute: 'numeric',
-        second: 'numeric'
-      });
-
-      const [currH, currM] = localTimeStr.split(':').map(Number);
+      const { totalMinutes: currentTotalMinutes } = getLocalTimeDetails(serverTimestamp);
       const [shiftH, shiftM] = guard.start_time.split(':').map(Number);
-
-      const currentTotalMinutes = currH * 60 + currM;
       const shiftTotalMinutes = shiftH * 60 + shiftM;
       const graceMinutes = parseInt(guard.grace_period_minutes || 15);
 
