@@ -10,6 +10,7 @@ let supabaseClient = null;
 if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   const rawUrl = process.env.SUPABASE_URL.trim();
   const cleanUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+  console.log(`[STORAGE INIT] Raw URL: "${rawUrl}" | Clean URL: "${cleanUrl}"`);
   supabaseClient = createClient(cleanUrl, process.env.SUPABASE_SERVICE_ROLE_KEY.trim());
 }
 
