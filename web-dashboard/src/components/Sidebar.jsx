@@ -21,6 +21,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'assignments', label: 'Officer Assignments', icon: UserCheck },
     { id: 'shifts', label: 'Shift Setup', icon: Clock },
     { id: 'reports', label: 'Reports Export', icon: FileSpreadsheet },
+    { id: 'audit-logs', label: 'Audit History', icon: History },
   ];
 
   return (

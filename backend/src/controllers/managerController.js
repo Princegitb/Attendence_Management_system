@@ -643,7 +643,12 @@ async function exportAttendanceReport(req, res) {
 // ==========================================
 async function getAuditLogs(req, res) {
   try {
-    return res.json({ success: true, data: [] });
+    const result = await db.query(
+      `SELECT * FROM audit_logs 
+       ORDER BY timestamp DESC 
+       LIMIT 100`
+    );
+    return res.json({ success: true, data: result.rows });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
