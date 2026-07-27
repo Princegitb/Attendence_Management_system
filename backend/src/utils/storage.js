@@ -8,7 +8,9 @@ const provider = process.env.STORAGE_PROVIDER || 'db';
 // Initialize Supabase Client if credentials are provided
 let supabaseClient = null;
 if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const rawUrl = process.env.SUPABASE_URL.trim();
+  const cleanUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+  supabaseClient = createClient(cleanUrl, process.env.SUPABASE_SERVICE_ROLE_KEY.trim());
 }
 
 /**

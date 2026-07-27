@@ -22,6 +22,9 @@ const mediaRoutes = require('./routes/mediaRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust Render's reverse proxy for express-rate-limit
+app.set('trust proxy', 1);
+
 // Security & Parsing Middlewares
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors());
