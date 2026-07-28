@@ -316,7 +316,7 @@ export default function PayrollGenerationView() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
               </div>
