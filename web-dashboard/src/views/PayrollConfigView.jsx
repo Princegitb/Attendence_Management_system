@@ -4,6 +4,7 @@ import { api } from '../services/api';
 
 export default function PayrollConfigView() {
   const [configs, setConfigs] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   
@@ -179,8 +180,17 @@ export default function PayrollConfigView() {
 
       {/* Roster Config List */}
       <div className="bg-slate-800/50 border border-slate-700/60 rounded-3xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-700/40 bg-slate-900/40">
+        <div className="p-4 border-b border-slate-700/40 bg-slate-900/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">Guard Configuration Detail Roster</h3>
+          <div className="relative max-w-xs w-full">
+            <input
+              type="text"
+              placeholder="Search guard name or mobile..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 placeholder-slate-500"
+            />
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
@@ -204,9 +214,21 @@ export default function PayrollConfigView() {
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-slate-500">No guards registered in the database.</td>
                 </tr>
+              ) : configs.filter(row => 
+                  row.guard_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  (row.guard_mobile && row.guard_mobile.includes(searchQuery))
+                ).length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-slate-500">No guards match your search query.</td>
+                </tr>
               ) : (
-                configs.map((row) => {
-                  const isEditing = editingId === row.guard_id;
+                configs
+                  .filter(row => 
+                    row.guard_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    (row.guard_mobile && row.guard_mobile.includes(searchQuery))
+                  )
+                  .map((row) => {
+                    const isEditing = editingId === row.guard_id;
                   return (
                     <tr key={row.guard_id} className="hover:bg-slate-700/30 transition-colors">
                       <td className="p-3.5 font-semibold text-white">{row.guard_name}</td>

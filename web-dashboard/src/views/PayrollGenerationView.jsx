@@ -10,6 +10,7 @@ export default function PayrollGenerationView() {
   const [year, setYear] = useState(currentYear);
   const [salaries, setSalaries] = useState([]);
   const [history, setHistory] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -243,9 +244,20 @@ export default function PayrollGenerationView() {
           {/* Wages Table Preview */}
           {salaries.length > 0 ? (
             <div className="bg-slate-800/50 border border-slate-700/60 rounded-3xl overflow-hidden shadow-xl">
-              <div className="p-4 border-b border-slate-700/40 bg-slate-900/40 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Calculated Payroll Preview</h3>
-                <span className="text-[10px] text-slate-400">Click any guard to view detailed monthly attendance calendar & slip breakdown.</span>
+              <div className="p-4 border-b border-slate-700/40 bg-slate-900/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">Calculated Payroll Preview</h3>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Click any guard to view detailed monthly attendance calendar & slip breakdown.</span>
+                </div>
+                <div className="relative max-w-xs w-full">
+                  <input
+                    type="text"
+                    placeholder="Search guard name or mobile..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 placeholder-slate-500"
+                  />
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-300">
@@ -262,10 +274,23 @@ export default function PayrollGenerationView() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {salaries.map((row) => (
-                      <tr key={row.guardId} className="hover:bg-slate-700/30 transition-colors">
-                        <td className="p-4 font-semibold text-white">
-                          <div>{row.guardName}</div>
+                    {salaries.filter(row => 
+                      row.guardName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      (row.guardMobile && row.guardMobile.includes(searchQuery))
+                    ).length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-6 text-center text-slate-500">No guards match your search query.</td>
+                      </tr>
+                    ) : (
+                      salaries
+                        .filter(row => 
+                          row.guardName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (row.guardMobile && row.guardMobile.includes(searchQuery))
+                        )
+                        .map((row) => (
+                          <tr key={row.guardId} className="hover:bg-slate-700/30 transition-colors">
+                            <td className="p-4 font-semibold text-white">
+                              <div>{row.guardName}</div>
                           <div className="text-[10px] text-slate-500 font-mono">{row.guardMobile || 'No mobile'}</div>
                         </td>
                         <td className="p-4">
