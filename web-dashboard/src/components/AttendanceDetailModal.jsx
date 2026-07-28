@@ -88,6 +88,20 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
               </span>
               <div className="text-sm font-semibold text-white">{record.guard_name}</div>
               <div className="text-slate-300">{record.post_name}</div>
+              {(Number(record.late_by_minutes) > 0 || Number(record.overtime_minutes) > 0) && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  {Number(record.late_by_minutes) > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full font-bold">
+                      Late {record.late_by_minutes} min
+                    </span>
+                  )}
+                  {Number(record.overtime_minutes) > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-full font-bold">
+                      OT +{record.overtime_minutes} min
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/50 text-xs space-y-1">

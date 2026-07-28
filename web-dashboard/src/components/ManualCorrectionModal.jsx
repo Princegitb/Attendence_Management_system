@@ -2,7 +2,17 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, FileText, CheckCircle } from 'lucide-react';
 
 export default function ManualCorrectionModal({ record, onClose, onSubmit }) {
-  const [status, setStatus] = useState(record?.status || 'CHECKED_IN');
+  // For PENDING_REVIEW rows, the manager must pick a scope first.
+  // For other statuses, they get a normal status dropdown.
+  const isLateCheckIn = record?.status === 'PENDING_REVIEW';
+
+  // For PENDING_REVIEW rows the user picks a scope, which maps to a final status:
+  //   CHECK_IN_ONLY → status remains PENDING_REVIEW (decision is recorded in audit log)
+  //   FULL_DAY      → status becomes APPROVED (full day counts as present)
+  const [scope, setScope] = useState(isLateCheckIn ? 'FULL_DAY' : null);
+  const [status, setStatus] = useState(
+    isLateCheckIn ? 'APPROVED' : (record?.status || 'CHECKED_IN')
+  );
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -19,13 +29,19 @@ export default function ManualCorrectionModal({ record, onClose, onSubmit }) {
     setSubmitting(true);
     setError('');
     try {
-      await onSubmit(record.id, status, reason.trim());
+      await onSubmit(record.id, status, reason.trim(), scope);
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to apply manual correction.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // When the manager toggles scope, derive the matching target status.
+  const handleScopeChange = (next) => {
+    setScope(next);
+    setStatus(next === 'CHECK_IN_ONLY' ? 'PENDING_REVIEW' : 'APPROVED');
   };
 
   return (
@@ -54,20 +70,70 @@ export default function ManualCorrectionModal({ record, onClose, onSubmit }) {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">New Attendance Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
-            >
-              <option value="CHECKED_IN">CHECKED_IN (Present)</option>
-              <option value="CHECKED_OUT">CHECKED_OUT (Completed)</option>
-              <option value="LATE">LATE (Marked after shift start)</option>
-              <option value="ABSENT">ABSENT (Guard not found at post)</option>
-              <option value="MISSED_CHECKOUT">MISSED_CHECKOUT</option>
-            </select>
-          </div>
+          {isLateCheckIn ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Manager decision for this late check-in
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={`flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  scope === 'CHECK_IN_ONLY'
+                    ? 'border-sky-500 bg-sky-500/10'
+                    : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                }`}>
+                  <input
+                    type="radio"
+                    name="correction_scope"
+                    value="CHECK_IN_ONLY"
+                    checked={scope === 'CHECK_IN_ONLY'}
+                    onChange={() => handleScopeChange('CHECK_IN_ONLY')}
+                    className="mt-0.5 accent-sky-500"
+                  />
+                  <span className="text-xs text-slate-200">
+                    <span className="font-semibold block">Approve Check-In Only</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Acknowledges the late check-in. Status stays PENDING_REVIEW for review after checkout.
+                    </span>
+                  </span>
+                </label>
+                <label className={`flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  scope === 'FULL_DAY'
+                    ? 'border-emerald-500 bg-emerald-500/10'
+                    : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                }`}>
+                  <input
+                    type="radio"
+                    name="correction_scope"
+                    value="FULL_DAY"
+                    checked={scope === 'FULL_DAY'}
+                    onChange={() => handleScopeChange('FULL_DAY')}
+                    className="mt-0.5 accent-emerald-500"
+                  />
+                  <span className="text-xs text-slate-200">
+                    <span className="font-semibold block">Approve Full Day</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Counts as full Present day for payroll. Late minutes are still tracked.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">New Attendance Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+              >
+                <option value="APPROVED">APPROVED (counts present)</option>
+                <option value="REJECTED">REJECTED (counts absent)</option>
+                <option value="CHECKED_IN">CHECKED_IN</option>
+                <option value="CHECKED_OUT">CHECKED_OUT</option>
+                <option value="MISSED_CHECKOUT">MISSED_CHECKOUT (flag for manager)</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">

@@ -7,6 +7,7 @@ dotenv.config();
 
 const initDb = require('./db/init');
 const seedDb = require('./db/seed');
+const { startMissedCheckoutCron } = require('./jobs/missedCheckoutJob');
 
 const authRoutes = require('./routes/authRoutes');
 const guardRoutes = require('./routes/guardRoutes');
@@ -66,6 +67,9 @@ app.use((err, req, res, next) => {
 // Start Server & Auto-Seed Database
 async function startServer() {
   await seedDb();
+
+  // Background jobs (missed-checkout flagging)
+  startMissedCheckoutCron();
 
   app.listen(PORT, () => {
     console.log(`\n==================================================`);

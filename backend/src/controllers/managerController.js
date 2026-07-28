@@ -514,6 +514,7 @@ async function getAttendanceLogs(req, res) {
              a.date, a.check_in_time, a.check_in_latitude, a.check_in_longitude, a.check_in_gps_accuracy,
              a.check_in_distance_from_post, a.check_in_photo_url,
              a.check_out_time, a.check_out_latitude, a.check_out_longitude, a.check_out_photo_url,
+             a.late_by_minutes, a.overtime_minutes,
              a.status
       FROM attendance a
       JOIN guards g ON a.guard_id = g.id
@@ -554,7 +555,11 @@ async function getAttendanceLogs(req, res) {
 async function correctAttendance(req, res) {
   try {
     const { id } = req.params;
-    const { status, reason } = req.body;
+    const { status, reason, scope } = req.body;
+    // scope = 'CHECK_IN_ONLY' | 'FULL_DAY'
+    //   Only meaningful when target status is APPROVED and the source status is PENDING_REVIEW.
+    //   CHECK_IN_ONLY keeps status = PENDING_REVIEW (decision recorded in audit log).
+    //   FULL_DAY sets status = APPROVED (full day counts as present).
 
     if (!reason || reason.trim().length < 5) {
       return res.status(400).json({
@@ -568,15 +573,35 @@ async function correctAttendance(req, res) {
       return res.status(404).json({ success: false, message: 'Attendance record not found.' });
     }
 
+    const allowed = ['APPROVED', 'REJECTED', 'MISSED_CHECKOUT', 'CHECKED_IN', 'CHECKED_OUT'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: `Unsupported target status: ${status}` });
+    }
+
     let finalStatus = status;
     if (status === 'APPROVED' && oldAtt.rows[0].check_out_time) {
+      // Day already finished → treat as approved checkout (payable).
       finalStatus = 'CHECKED_OUT';
+    }
+    if (status === 'APPROVED' && scope === 'CHECK_IN_ONLY') {
+      // Manager approved the late check-in only — keep status PENDING_REVIEW
+      // so the dashboard surfaces it again after the day finishes (or now).
+      finalStatus = 'PENDING_REVIEW';
     }
 
     const updatedRes = await db.query(
       `UPDATE attendance SET status = $1 WHERE id = $2 RETURNING *`,
       [finalStatus, id]
     );
+
+    // If the manager rejected a record that had auto-recorded overtime,
+    // void the OT row — REJECTED implies absent for the day, no OT paid.
+    if (finalStatus === 'REJECTED') {
+      await db.query(
+        `DELETE FROM overtime_records WHERE attendance_id = $1 AND auto_generated = TRUE`,
+        [id]
+      );
+    }
 
     await logAuditEvent({
       action: 'MANUAL_ATTENDANCE_CORRECTION',
@@ -586,7 +611,7 @@ async function correctAttendance(req, res) {
       targetId: id,
       oldValue: oldAtt.rows[0],
       newValue: updatedRes.rows[0],
-      reason: reason.trim()
+      reason: (scope ? `[scope=${scope}] ` : '') + reason.trim()
     });
 
     return res.json({

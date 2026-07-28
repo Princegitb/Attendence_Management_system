@@ -93,10 +93,10 @@ export const api = {
     if (shiftId) url += `&shift_id=${shiftId}`;
     return request(url);
   },
-  correctAttendance: (id, status, reason) => request(`/attendance/${id}/correction`, {
+  correctAttendance: (id, status, reason, scope) => request(`/attendance/${id}/correction`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status, reason })
+    body: JSON.stringify({ status, reason, scope })
   }),
 
   // Guards

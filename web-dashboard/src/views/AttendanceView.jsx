@@ -65,8 +65,8 @@ export default function AttendanceView() {
     loadData();
   }, [date, officerId, postId, statusFilter, shiftFilter]);
 
-  const handleCorrectionSubmit = async (id, status, reason) => {
-    const res = await api.correctAttendance(id, status, reason);
+  const handleCorrectionSubmit = async (id, status, reason, scope) => {
+    const res = await api.correctAttendance(id, status, reason, scope);
     if (res.success) {
       loadData();
     } else {
@@ -98,6 +98,7 @@ export default function AttendanceView() {
   };
 
   const pendingReviewCount = attendance.filter(a => a.status === 'PENDING_REVIEW').length;
+  const missedCheckoutCount = attendance.filter(a => a.status === 'MISSED_CHECKOUT').length;
 
   return (
     <div className="space-y-6">
@@ -135,6 +136,27 @@ export default function AttendanceView() {
             className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors shrink-0"
           >
             Filter Pending ({pendingReviewCount})
+          </button>
+        </div>
+      )}
+
+      {/* Missed Checkout Alert Banner */}
+      {missedCheckoutCount > 0 && (
+        <div className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-2xl flex items-center justify-between text-rose-400 text-xs shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-rose-500/20 rounded-xl">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-white">{missedCheckoutCount} Missed Checkout(s) Flagged by Cron</span>
+              <p className="text-slate-300">Guards who checked in but never checked out. Approve to count as Present or Reject to mark as Absent.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setStatusFilter('MISSED_CHECKOUT')}
+            className="px-3.5 py-1.5 bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold rounded-xl text-xs transition-colors shrink-0"
+          >
+            Filter Missed ({missedCheckoutCount})
           </button>
         </div>
       )}
@@ -206,6 +228,7 @@ export default function AttendanceView() {
             <option value="REJECTED">REJECTED</option>
             <option value="CHECKED_IN">CHECKED_IN</option>
             <option value="CHECKED_OUT">CHECKED_OUT</option>
+            <option value="MISSED_CHECKOUT">MISSED_CHECKOUT</option>
           </select>
         </div>
       </div>
@@ -262,27 +285,43 @@ export default function AttendanceView() {
                     </td>
                     <td className="p-3.5 text-sky-400 font-medium">{rec.marked_by_officer}</td>
                     <td className="p-3.5">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        rec.status === 'APPROVED'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                          : rec.status === 'PENDING_REVIEW'
-                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
-                          : rec.status === 'CHECKED_IN'
-                          ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-                          : rec.status === 'CHECKED_OUT'
-                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
-                          : rec.status === 'REJECTED'
-                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                          : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
-                      }`}>
-                        {rec.status === 'PENDING_REVIEW' 
-                          ? 'PENDING REVIEW' 
-                          : rec.status === 'CHECKED_IN' 
-                          ? 'CHECKIN DONE' 
-                          : rec.status === 'CHECKED_OUT' 
-                          ? 'CHECKOUT DONE' 
-                          : rec.status}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          rec.status === 'APPROVED'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            : rec.status === 'PENDING_REVIEW'
+                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
+                            : rec.status === 'CHECKED_IN'
+                            ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                            : rec.status === 'CHECKED_OUT'
+                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                            : rec.status === 'REJECTED'
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                            : rec.status === 'MISSED_CHECKOUT'
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 animate-pulse'
+                            : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                        }`}>
+                          {rec.status === 'PENDING_REVIEW'
+                            ? 'PENDING REVIEW'
+                            : rec.status === 'CHECKED_IN'
+                            ? 'CHECKIN DONE'
+                            : rec.status === 'CHECKED_OUT'
+                            ? 'CHECKOUT DONE'
+                            : rec.status === 'MISSED_CHECKOUT'
+                            ? 'MISSED CHECKOUT'
+                            : rec.status}
+                        </span>
+                        {Number(rec.late_by_minutes) > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                            Late {rec.late_by_minutes}m
+                          </span>
+                        )}
+                        {Number(rec.overtime_minutes) > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-indigo-500/10 text-indigo-400 border-indigo-500/30">
+                            OT +{rec.overtime_minutes}m
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3.5 text-right space-x-1.5">
                       {rec.status === 'PENDING_REVIEW' && (
@@ -331,6 +370,25 @@ export default function AttendanceView() {
                         >
                           <XCircle className="w-3.5 h-3.5" /> Reject
                         </button>
+                      )}
+
+                      {rec.status === 'MISSED_CHECKOUT' && (
+                        <>
+                          <button
+                            onClick={() => promptStatusConfirmation(rec.id, 'APPROVED', rec.guard_name, 'Approved by Manager (missed-checkout resolved)')}
+                            title="Approve Missed Checkout"
+                            className="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Approve Day
+                          </button>
+                          <button
+                            onClick={() => promptStatusConfirmation(rec.id, 'REJECTED', rec.guard_name, 'Rejected by Manager (missed-checkout)')}
+                            title="Reject Missed Checkout"
+                            className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </button>
+                        </>
                       )}
 
                       <button

@@ -87,7 +87,7 @@ async function getOfficerGuardsChecklist(req, res) {
 
     // Fetch guards assigned directly to officer or assigned via post
     const queryStr = `
-      SELECT 
+      SELECT
         g.id AS guard_id,
         g.name AS guard_name,
         g.mobile AS guard_mobile,
@@ -108,14 +108,16 @@ async function getOfficerGuardsChecklist(req, res) {
         a.check_in_distance_from_post,
         a.check_out_time,
         a.check_out_photo_url,
-        a.status AS attendance_status
+        a.status AS attendance_status,
+        a.late_by_minutes,
+        a.overtime_minutes
       FROM guards g
       JOIN posts p ON g.assigned_post_id = p.id
       LEFT JOIN shifts s ON g.assigned_shift_id = s.id
       JOIN officer_assignments oa ON (oa.guard_id = g.id OR oa.post_id = g.assigned_post_id)
       LEFT JOIN attendance a ON (
         a.guard_id = g.id AND a.date = (
-          CASE 
+          CASE
             WHEN s.end_time < s.start_time AND $4 <= (EXTRACT(HOUR FROM s.end_time) * 60 + EXTRACT(MINUTE FROM s.end_time) + 240)
             THEN $3::DATE
             ELSE $2::DATE
@@ -138,7 +140,9 @@ async function getOfficerGuardsChecklist(req, res) {
       } else if (row.attendance_status) {
         status = row.attendance_status;
       } else if (row.check_in_time) {
-        status = 'APPROVED';
+        // Legacy fallback: if a check_in_time exists but stored status is null,
+        // assume auto-approved CHECKED_IN.
+        status = 'CHECKED_IN';
       }
 
       return {
@@ -166,7 +170,9 @@ async function getOfficerGuardsChecklist(req, res) {
           checkInDistance: row.check_in_distance_from_post ? parseFloat(row.check_in_distance_from_post) : null,
           checkOutTime: row.check_out_time || null,
           checkOutPhotoUrl: row.check_out_photo_url || null,
-          status: status
+          status: status,
+          lateByMinutes: row.late_by_minutes != null ? parseInt(row.late_by_minutes, 10) : 0,
+          overtimeMinutes: row.overtime_minutes != null ? parseInt(row.overtime_minutes, 10) : 0
         }
       };
     });
@@ -262,12 +268,13 @@ async function markCheckIn(req, res) {
       });
     }
 
-    // 5. Shift & Grace Period Verification
-    // Check-in always starts as CHECKED_IN. Manager approves only after checkout.
-    // Late check-ins (beyond grace period) go to PENDING_REVIEW for manager attention.
+    // 5. Shift & Grace Period Verification → Auto-Approval Decision Tree
+    // - On-time (or within grace) → auto-approved, status = CHECKED_IN
+    // - Late (beyond grace) → PENDING_REVIEW (manager must approve/reject)
+    // late_by_minutes is recorded for analytics even on auto-approved check-ins.
     let initialStatus = 'CHECKED_IN';
-    let statusMessage = `Check-in recorded for ${guard.name}. Awaiting checkout and Manager approval.`;
-    let isLateCheckIn = false;
+    let statusMessage = `Check-in recorded for ${guard.name}. Auto-approved (on time).`;
+    let lateByMinutes = 0;
 
     if (guard.start_time) {
       const { totalMinutes: currentTotalMinutes } = getLocalTimeDetails(serverTimestamp);
@@ -277,23 +284,27 @@ async function markCheckIn(req, res) {
 
       if (currentTotalMinutes > (shiftTotalMinutes + graceMinutes)) {
         initialStatus = 'PENDING_REVIEW';
-        isLateCheckIn = true;
-        statusMessage = `Check-in submitted for ${guard.name} (Late check-in). Kept for Manager review.`;
+        lateByMinutes = currentTotalMinutes - shiftTotalMinutes;
+        statusMessage = `Check-in submitted for ${guard.name} (${lateByMinutes} min late). Kept for Manager review.`;
+      } else if (currentTotalMinutes > shiftTotalMinutes) {
+        // Within grace: still auto-approved, but record small lateness for analytics
+        lateByMinutes = currentTotalMinutes - shiftTotalMinutes;
+        statusMessage = `Check-in recorded for ${guard.name}. Auto-approved (within grace, ${lateByMinutes} min late).`;
       }
     }
 
     // 6. Upload compressed photo to object storage
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 7. Create attendance record with initial status (APPROVED or PENDING_REVIEW)
+    // 7. Create attendance record with initial status (CHECKED_IN auto-approved or PENDING_REVIEW)
     const insertRes = await db.query(
       `INSERT INTO attendance (
-        guard_id, marked_by_officer_id, date, check_in_time, 
-        check_in_latitude, check_in_longitude, check_in_gps_accuracy, 
-        check_in_distance_from_post, check_in_photo_url, 
-        post_id_snapshot, radius_snapshot, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING id, check_in_time, status`,
+        guard_id, marked_by_officer_id, date, check_in_time,
+        check_in_latitude, check_in_longitude, check_in_gps_accuracy,
+        check_in_distance_from_post, check_in_photo_url,
+        post_id_snapshot, radius_snapshot, status, late_by_minutes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id, check_in_time, status, late_by_minutes`,
       [
         guard.id,
         officerId,
@@ -306,7 +317,8 @@ async function markCheckIn(req, res) {
         uploadResult.url,
         guard.post_id,
         allowedRadius,
-        initialStatus
+        initialStatus,
+        lateByMinutes
       ]
     );
 
@@ -316,7 +328,8 @@ async function markCheckIn(req, res) {
       performedByRole: 'OFFICER',
       targetType: 'Guard',
       targetId: guard.id,
-      reason: `Guard ${guard.name} checked in (${distanceMeters}m from post). Status: ${initialStatus}`
+      reason: `Guard ${guard.name} checked in (${distanceMeters}m from post). Status: ${initialStatus}` +
+              (lateByMinutes > 0 ? ` (${lateByMinutes} min late)` : '')
     });
 
     return res.json({
@@ -329,7 +342,9 @@ async function markCheckIn(req, res) {
         checkInTime: insertRes.rows[0].check_in_time,
         distanceMeters,
         photoUrl: uploadResult.url,
-        status: initialStatus
+        status: initialStatus,
+        lateByMinutes,
+        autoApproved: initialStatus === 'CHECKED_IN'
       }
     });
 
@@ -420,20 +435,57 @@ async function markCheckOut(req, res) {
     // 5. Upload photo
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 6. Always set CHECKED_OUT on checkout so manager can review the complete attendance.
-    // Even late check-ins (PENDING_REVIEW) transition to CHECKED_OUT.
-    // Only REJECTED records are preserved — manager already decided on those.
+    // 6. Always set CHECKED_OUT on checkout — auto-approved, no manager work.
+    // Late check-outs (overtime) record overtime_minutes and an auto overtime_records row.
+    // Only REJECTED records are preserved (manager already decided on those).
     const currentStatus = existingAtt.rows[0].status;
     const newStatus = (currentStatus === 'REJECTED') ? 'REJECTED' : 'CHECKED_OUT';
 
+    // 6a. Compute overtime minutes beyond shift end (if any)
+    let overtimeMinutes = 0;
+    let otHours = 0;
+    let otRecordId = null;
+
+    if (newStatus === 'CHECKED_OUT' && guard.start_time && guard.end_time) {
+      const { totalMinutes: currentTotalMinutes } = getLocalTimeDetails(serverTimestamp);
+      const [endH, endM] = guard.end_time.split(':').map(Number);
+      const shiftEndMinutes = endH * 60 + endM;
+      if (currentTotalMinutes > shiftEndMinutes) {
+        overtimeMinutes = currentTotalMinutes - shiftEndMinutes;
+        otHours = +(overtimeMinutes / 60).toFixed(2);
+      }
+      // Early checkout → no negative overtime; stays 0.
+    }
+
+    // 7. Persist checkout with overtime_minutes
     const updateRes = await db.query(
       `UPDATE attendance
-       SET check_out_time = $1, check_out_latitude = $2, check_out_longitude = $3, 
-           check_out_photo_url = $4, status = $5
-       WHERE id = $6
-       RETURNING id, check_out_time, status`,
-      [serverTimestamp, latitude, longitude, uploadResult.url, newStatus, existingAtt.rows[0].id]
+       SET check_out_time = $1, check_out_latitude = $2, check_out_longitude = $3,
+           check_out_photo_url = $4, status = $5, overtime_minutes = $6
+       WHERE id = $7
+       RETURNING id, check_out_time, status, late_by_minutes, overtime_minutes`,
+      [serverTimestamp, latitude, longitude, uploadResult.url, newStatus, overtimeMinutes, existingAtt.rows[0].id]
     );
+
+    // 8. Auto-record overtime_records on late check-out (upsert on guard_id, date)
+    if (otHours > 0) {
+      const otInsert = await db.query(
+        `INSERT INTO overtime_records
+           (guard_id, attendance_id, date, overtime_hours, status, approved_by,
+            auto_generated, source, updated_at)
+         VALUES ($1, $2, $3, $4, 'APPROVED', NULL, TRUE, 'AUTO_LATE_CHECKOUT', NOW())
+         ON CONFLICT (guard_id, date) DO UPDATE
+           SET overtime_hours  = EXCLUDED.overtime_hours,
+               attendance_id   = EXCLUDED.attendance_id,
+               status          = 'APPROVED',
+               auto_generated  = TRUE,
+               source          = 'AUTO_LATE_CHECKOUT',
+               updated_at      = NOW()
+         RETURNING id`,
+        [guard.id, existingAtt.rows[0].id, today, otHours]
+      );
+      otRecordId = otInsert.rows[0].id;
+    }
 
     await logAuditEvent({
       action: 'GUARD_CHECK_OUT',
@@ -441,12 +493,15 @@ async function markCheckOut(req, res) {
       performedByRole: 'OFFICER',
       targetType: 'Guard',
       targetId: guard.id,
-      reason: `Guard ${guard.name} checked out successfully (${distanceMeters}m from post)`
+      reason: `Guard ${guard.name} checked out (${distanceMeters}m from post). Status: ${newStatus}` +
+              (overtimeMinutes > 0 ? `, Overtime: ${overtimeMinutes} min (auto-approved)` : '')
     });
 
     return res.json({
       success: true,
-      message: `Check-out recorded for ${guard.name} successfully.`,
+      message: overtimeMinutes > 0
+        ? `Check-out recorded for ${guard.name}. Overtime: ${overtimeMinutes} min (auto-approved).`
+        : `Check-out recorded for ${guard.name} successfully.`,
       data: {
         attendanceId: updateRes.rows[0].id,
         guardId: guard.id,
@@ -454,7 +509,11 @@ async function markCheckOut(req, res) {
         checkOutTime: updateRes.rows[0].check_out_time,
         distanceMeters,
         photoUrl: uploadResult.url,
-        status: 'CHECKED_OUT'
+        status: newStatus,
+        overtimeMinutes,
+        overtimeHours: otHours,
+        overtimeRecordId: otRecordId,
+        autoApproved: true
       }
     });
 

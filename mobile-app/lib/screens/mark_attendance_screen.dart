@@ -27,6 +27,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
 
   String? _serverError;
   String? _successMsg;
+  bool _autoApproved = true; // assume auto-approved until backend says otherwise
 
   @override
   void initState() {
@@ -135,6 +136,10 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
       if (res['success'] == true) {
         setState(() {
           _successMsg = res['message'];
+          // Backend signals whether the operation was auto-approved.
+          // For a check-in, autoApproved=false means PENDING_REVIEW (manager action needed).
+          // For a check-out, autoApproved is always true.
+          _autoApproved = res['data']?['autoApproved'] == true;
         });
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) Navigator.pop(context);
@@ -256,24 +261,31 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                   ),
                 ),
 
-              // Success Banner
+              // Success Banner — colour depends on whether backend auto-approved the action.
               if (_successMsg != null)
                 Container(
                   padding: const EdgeInsets.all(14),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: emeraldColor.withValues(alpha: 0.15),
+                    color: (_autoApproved ? emeraldColor : Colors.amber).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: emeraldColor.withValues(alpha: 0.5)),
+                    border: Border.all(color: (_autoApproved ? emeraldColor : Colors.amber).withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_outline, color: emeraldAccent),
+                      Icon(
+                        _autoApproved ? Icons.check_circle_outline : Icons.info_outline,
+                        color: _autoApproved ? emeraldAccent : Colors.amberAccent,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           _successMsg!,
-                          style: const TextStyle(color: emeraldAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: _autoApproved ? emeraldAccent : Colors.amberAccent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],

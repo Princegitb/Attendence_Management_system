@@ -185,3 +185,26 @@ CREATE TABLE IF NOT EXISTS payroll_details (
     CONSTRAINT unique_payroll_guard UNIQUE (payroll_id, guard_id)
 );
 
+-- ============================================================
+-- MIGRATION: Smart Attendance Auto-Approval Flow
+-- Adds tracking for late check-in minutes and overtime minutes,
+-- plus audit fields on overtime_records to distinguish auto-recorded OT.
+-- ============================================================
+
+-- 14. Track late check-in minutes and overtime minutes on attendance
+ALTER TABLE attendance
+  ADD COLUMN IF NOT EXISTS late_by_minutes   INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS overtime_minutes  INT NOT NULL DEFAULT 0;
+
+-- 15. Trace auto-generated overtime (added by markCheckOut when guard leaves late)
+ALTER TABLE overtime_records
+  ADD COLUMN IF NOT EXISTS auto_generated BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS source          VARCHAR(30) NOT NULL DEFAULT 'MANUAL';
+-- source values: 'AUTO_LATE_CHECKOUT' (auto-recorded), 'MANUAL' (manager-entered)
+
+-- 16. Partial index for the missed-checkout cron scan
+CREATE INDEX IF NOT EXISTS idx_attendance_open_checkouts
+  ON attendance (date)
+  WHERE check_out_time IS NULL
+    AND status NOT IN ('REJECTED', 'MISSED_CHECKOUT', 'PENDING_REVIEW');
+
