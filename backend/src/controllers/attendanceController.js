@@ -440,10 +440,10 @@ async function markCheckOut(req, res) {
     const [endH, endM, endS] = guard.end_time.split(':').map(Number);
 
     // Expected shift start is on the logical shift date
-    const expectedShiftStart = new Date(`${today}T${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:${String(startS || 0).padStart(2, '0')}`);
+    const expectedShiftStart = new Date(`${today}T${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:${String(startS || 0).padStart(2, '0')}+05:30`);
     
     // Expected shift end
-    let expectedShiftEnd = new Date(`${today}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS || 0).padStart(2, '0')}`);
+    let expectedShiftEnd = new Date(`${today}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS || 0).padStart(2, '0')}+05:30`);
     
     // If shift end time is less than start time, it's an overnight shift (ends on the next calendar day)
     const startTotalMin = startH * 60 + startM;
