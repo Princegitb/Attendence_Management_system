@@ -180,5 +180,33 @@ export const api = {
   getReportExportUrl: (fromDate, toDate) => {
     const token = localStorage.getItem('guard_access_token');
     return `${API_BASE}/reports/export?from_date=${fromDate}&to_date=${toDate}&token=${token}`;
-  }
+  },
+
+  // Payroll
+  getPayrollConfigs: () => request('/payroll/configurations'),
+  updatePayrollConfig: (data) => request('/payroll/configurations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  getAdvances: (guardId) => request(`/payroll/advances?guard_id=${guardId || ''}`),
+  createAdvance: (data) => request('/payroll/advances', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  updateAdvance: (id, data) => request(`/payroll/advances/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  deleteAdvance: (id) => request(`/payroll/advances/${id}`, { method: 'DELETE' }),
+  calculatePayroll: (month, year) => request(`/payroll/calculate?month=${month}&year=${year}`),
+  generatePayroll: (month, year, salaries) => request('/payroll/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ month, year, employee_salaries: salaries })
+  }),
+  getPayrollHistory: () => request('/payroll/history'),
+  getPayrollDetails: (id) => request(`/payroll/details/${id}`)
 };

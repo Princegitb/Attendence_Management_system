@@ -8,7 +8,10 @@ import {
   Clock,
   UserCheck,
   FileSpreadsheet,
-  History
+  History,
+  DollarSign,
+  Landmark,
+  Award
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
@@ -22,6 +25,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'shifts', label: 'Shift Setup', icon: Clock },
     { id: 'reports', label: 'Reports Export', icon: FileSpreadsheet },
     { id: 'audit-logs', label: 'Audit History', icon: History },
+    { id: 'payroll-config', label: 'Salary Setup', icon: DollarSign },
+    { id: 'payroll-advances', label: 'Advance Ledger', icon: Landmark },
+    { id: 'payroll-run', label: 'Monthly Payroll', icon: Award },
   ];
 
   return (

@@ -17,7 +17,12 @@ const inMemoryTables = {
   guards: [],
   officer_assignments: [],
   attendance: [],
-  audit_logs: []
+  audit_logs: [],
+  salary_configurations: [],
+  salary_advances: [],
+  overtime_records: [],
+  payrolls: [],
+  payroll_details: []
 };
 
 let autoIncrementIds = {
@@ -28,7 +33,12 @@ let autoIncrementIds = {
   guards: 1,
   officer_assignments: 1,
   attendance: 1,
-  audit_logs: 1
+  audit_logs: 1,
+  salary_configurations: 1,
+  salary_advances: 1,
+  overtime_records: 1,
+  payrolls: 1,
+  payroll_details: 1
 };
 
 try {
@@ -306,6 +316,40 @@ function simulateQuery(text, params) {
     if (lowerSql.includes('from audit_logs')) {
       return { rows: [...inMemoryTables.audit_logs], rowCount: inMemoryTables.audit_logs.length };
     }
+
+    if (lowerSql.includes('from salary_configurations')) {
+      let res = [...inMemoryTables.salary_configurations];
+      if (lowerSql.includes('where guard_id = $1')) {
+        res = res.filter(sc => String(sc.guard_id) === String(params[0]));
+      }
+      return { rows: res, rowCount: res.length };
+    }
+
+    if (lowerSql.includes('from salary_advances')) {
+      let res = [...inMemoryTables.salary_advances];
+      if (lowerSql.includes('where guard_id = $1')) {
+        res = res.filter(sa => String(sa.guard_id) === String(params[0]));
+      }
+      return { rows: res, rowCount: res.length };
+    }
+
+    if (lowerSql.includes('from overtime_records')) {
+      let res = [...inMemoryTables.overtime_records];
+      if (lowerSql.includes('where guard_id = $1')) {
+        res = res.filter(or => String(or.guard_id) === String(params[0]));
+      }
+      return { rows: res, rowCount: res.length };
+    }
+
+    if (lowerSql.includes('from payrolls')) {
+      let res = [...inMemoryTables.payrolls];
+      return { rows: res, rowCount: res.length };
+    }
+
+    if (lowerSql.includes('from payroll_details')) {
+      let res = [...inMemoryTables.payroll_details];
+      return { rows: res, rowCount: res.length };
+    }
   }
 
   // Handle INSERT
@@ -440,6 +484,91 @@ function simulateQuery(text, params) {
         timestamp: new Date()
       };
       inMemoryTables.audit_logs.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('salary_configurations')) {
+      const existingIdx = inMemoryTables.salary_configurations.findIndex(sc => String(sc.guard_id) === String(params[0]));
+      const newObj = {
+        id: existingIdx >= 0 ? inMemoryTables.salary_configurations[existingIdx].id : autoIncrementIds.salary_configurations++,
+        guard_id: params[0],
+        salary_type: params[1],
+        basic_salary: params[2],
+        ot_rate_per_hour: params[3],
+        is_ot_eligible: params[4],
+        created_at: new Date()
+      };
+      if (existingIdx >= 0) {
+        inMemoryTables.salary_configurations[existingIdx] = newObj;
+      } else {
+        inMemoryTables.salary_configurations.push(newObj);
+      }
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('salary_advances')) {
+      const newObj = {
+        id: autoIncrementIds.salary_advances++,
+        guard_id: params[0],
+        amount: params[1],
+        advance_date: params[2] || new Date(),
+        reason: params[3],
+        created_by: params[4],
+        created_at: new Date()
+      };
+      inMemoryTables.salary_advances.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('overtime_records')) {
+      const newObj = {
+        id: autoIncrementIds.overtime_records++,
+        guard_id: params[0],
+        attendance_id: params[1],
+        date: params[2],
+        overtime_hours: params[3],
+        status: params[4] || 'PENDING',
+        approved_by: params[5],
+        created_at: new Date()
+      };
+      inMemoryTables.overtime_records.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('payrolls')) {
+      const newObj = {
+        id: autoIncrementIds.payrolls++,
+        month: params[0],
+        year: params[1],
+        status: params[2] || 'DRAFT',
+        total_basic_earnings: params[3],
+        total_ot_earnings: params[4],
+        total_advance_deductions: params[5],
+        total_net_salary: params[6],
+        generated_by: params[7],
+        created_at: new Date()
+      };
+      inMemoryTables.payrolls.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('payroll_details')) {
+      const newObj = {
+        id: autoIncrementIds.payroll_details++,
+        payroll_id: params[0],
+        guard_id: params[1],
+        present_days: params[2],
+        absent_days: params[3],
+        half_days: params[4],
+        overtime_hours: params[5],
+        basic_earnings: params[6],
+        ot_earnings: params[7],
+        advance_deduction: params[8],
+        other_deductions: params[9],
+        net_salary: params[10],
+        created_at: new Date()
+      };
+      inMemoryTables.payroll_details.push(newObj);
       return { rows: [newObj], rowCount: 1 };
     }
   }
