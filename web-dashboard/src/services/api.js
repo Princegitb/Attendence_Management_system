@@ -214,32 +214,5 @@ export const api = {
     body: JSON.stringify({ month, year, employee_salaries: salaries })
   }),
   getPayrollHistory: () => request('/payroll/history'),
-  getPayrollDetails: (id) => request(`/payroll/details/${id}`),
-
-  // Holidays & Weekly Offs
-  getHolidayCalendars: () => request('/holidays/calendars'),
-  createHolidayCalendar: (data) => request('/holidays/calendars', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }),
-  publishHolidayCalendar: (id) => request(`/holidays/calendars/${id}/publish`, { method: 'PUT' }),
-  addCalendarHoliday: (data) => request('/holidays/calendars/holidays', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }),
-  getCalendarHolidays: (calendarId) => request(`/holidays/calendars/${calendarId}/holidays`),
-  deleteCalendarHoliday: (id) => request(`/holidays/calendars/holidays/${id}`, { method: 'DELETE' }),
-  linkPostToCalendar: (data) => request('/holidays/calendars/link-post', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }),
-  getFloatingHolidayRequests: () => request('/holidays/floating/requests'),
-  approveFloatingHoliday: (id, status) => request(`/holidays/floating/${id}/approve`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
-  })
+  getPayrollDetails: (id) => request(`/payroll/details/${id}`)
 };

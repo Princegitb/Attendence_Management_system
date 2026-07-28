@@ -173,29 +173,8 @@ async function getGuardPayrollDetails(req, res) {
       [guard_id, startDateStr, endDateStr]
     );
 
-    // 5. Fetch calendar holidays if guard has a linked calendar
-    let holidaysList = [];
-    if (guard.calendar_id) {
-      const holidaysRes = await db.query(
-        `SELECT date, name, type FROM calendar_holidays
-         WHERE calendar_id = $1 AND date >= $2 AND date <= $3`,
-        [guard.calendar_id, startDateStr, endDateStr]
-      );
-      holidaysList = holidaysRes.rows;
-    }
-
-    // Run attendance evaluation (weekly offs, Saturday rules, sandwich policy)
-    const evaluation = evaluateMonthlyAttendance({
-      year: yearNum,
-      month: monthNum,
-      weeklyOffs: guard.weekly_offs || [],
-      saturdayPolicy: guard.saturday_policy || 'ALL_WORKING',
-      sandwichPolicy: guard.sandwich_policy || false,
-      holidays: holidaysList,
-      attendance: attRes.rows,
-      overtime: otRes.rows
-    });
-
+    const presentDays = attRes.rows.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
+    const absentDays = daysInMonth - presentDays;
     const approvedOtHours = otRes.rows.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
 
     const calculation = config ? calculateSalary({
@@ -203,18 +182,32 @@ async function getGuardPayrollDetails(req, res) {
       basicSalary: config.basic_salary,
       otRatePerHour: config.ot_rate_per_hour,
       isOtEligible: config.is_ot_eligible,
-      presentDays: evaluation.presentDays,
-      absentDays: evaluation.absentDays,
+      presentDays,
+      absentDays,
       totalApprovedOtHours: approvedOtHours,
       totalAdvances: 0,
       daysInMonth
     }) : null;
 
+    const attendanceMap = Array.from({ length: daysInMonth }).map((_, index) => {
+      const dayNum = index + 1;
+      const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      const att = attRes.rows.find(a => a.date.split('T')[0] === dateStr);
+      const isPresent = att && ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(att.status);
+      return {
+        status: isPresent ? 'PRESENT' : 'ABSENT',
+        otHours: otRes.rows.find(ot => ot.date.split('T')[0] === dateStr && ot.status === 'APPROVED')?.overtime_hours || 0,
+        checkInTime: att ? att.check_in_time : null,
+        checkOutTime: att ? att.check_out_time : null,
+        label: isPresent ? 'Present' : 'Absent'
+      };
+    });
+
     return res.json({
       success: true,
       guard,
       config,
-      attendance: evaluation.days, // Return structured calendar day array
+      attendance: attendanceMap,
       overtime: otRes.rows,
       daysInMonth,
       summary: calculation
@@ -422,25 +415,14 @@ async function calculateMonthlyPayroll(req, res) {
     const startDateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
     const endDateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${daysInMonth}`;
 
-    // Get all guards with salary configurations and their post's holiday calendars
+    // Get all guards with salary configurations
     const guardsRes = await db.query(
       `SELECT g.id, g.name, g.mobile, g.assigned_post_id,
-              sc.salary_type, sc.basic_salary, sc.ot_rate_per_hour, sc.is_ot_eligible,
-              hc.weekly_offs, hc.saturday_policy, hc.sandwich_policy, hc.id AS calendar_id
+              sc.salary_type, sc.basic_salary, sc.ot_rate_per_hour, sc.is_ot_eligible
        FROM guards g
        JOIN salary_configurations sc ON g.id = sc.guard_id
-       LEFT JOIN posts p ON g.assigned_post_id = p.id
-       LEFT JOIN holiday_calendars hc ON p.holiday_calendar_id = hc.id
        WHERE g.status = 'ACTIVE'`
     );
-
-    // Fetch all holidays in this date range
-    const holidaysRes = await db.query(
-      `SELECT calendar_id, date, name, type FROM calendar_holidays
-       WHERE date >= $1 AND date <= $2`,
-      [startDateStr, endDateStr]
-    );
-    const holidaysList = holidaysRes.rows;
 
     const payrollRows = [];
 
@@ -468,21 +450,8 @@ async function calculateMonthlyPayroll(req, res) {
       );
       const totalAdvances = parseFloat(advRes.rows[0].total_advances);
 
-      // Filter holidays that apply to this guard's calendar
-      const guardHolidays = holidaysList.filter(h => h.calendar_id === guard.calendar_id);
-
-      // Run structured attendance evaluation (calculating sandwich offs / Saturday offs)
-      const evaluation = evaluateMonthlyAttendance({
-        year: yearNum,
-        month: monthNum,
-        weeklyOffs: guard.weekly_offs || [],
-        saturdayPolicy: guard.saturday_policy || 'ALL_WORKING',
-        sandwichPolicy: guard.sandwich_policy || false,
-        holidays: guardHolidays,
-        attendance: attRes.rows,
-        overtime: otRes.rows
-      });
-
+      const presentDays = attRes.rows.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
+      const absentDays = daysInMonth - presentDays;
       const totalOtHours = otRes.rows.reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
 
       // Calculate final salary breakdown
@@ -491,8 +460,8 @@ async function calculateMonthlyPayroll(req, res) {
         basicSalary: guard.basic_salary,
         otRatePerHour: guard.ot_rate_per_hour,
         isOtEligible: guard.is_ot_eligible,
-        presentDays: evaluation.presentDays,
-        absentDays: evaluation.absentDays,
+        presentDays,
+        absentDays,
         totalApprovedOtHours: totalOtHours,
         totalAdvances,
         daysInMonth

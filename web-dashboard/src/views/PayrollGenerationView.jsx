@@ -508,25 +508,18 @@ export default function PayrollGenerationView() {
                         const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(year, month - 1, dayNum).getDay()];
                         
                         const isPresent = dayData.status === 'PRESENT';
-                        const isPaidOff = dayData.status === 'PAID_OFF';
-                        const isSandwichAbsent = dayData.status === 'SANDWICHED_ABSENT';
                         const otHours = parseFloat(dayData.otHours || 0);
-
-                        let cardStyle = 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20';
-                        if (isPresent) {
-                          cardStyle = otHours > 0 
-                            ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20' 
-                            : 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20';
-                        } else if (isPaidOff) {
-                          cardStyle = 'bg-sky-500/10 border-sky-500/30 hover:bg-sky-500/20';
-                        } else if (isSandwichAbsent) {
-                          cardStyle = 'bg-rose-700/20 border-rose-600/40 hover:bg-rose-700/30';
-                        }
 
                         return (
                           <div
                             key={dayNum}
-                            className={`p-2 rounded-xl border flex flex-col items-center justify-between h-14 min-w-[45px] relative group transition-all ${cardStyle}`}
+                            className={`p-2 rounded-xl border flex flex-col items-center justify-between h-14 min-w-[45px] relative group transition-all ${
+                              isPresent
+                                ? otHours > 0
+                                  ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
+                                  : 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20'
+                                : 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20'
+                            }`}
                           >
                             <div className="flex justify-between items-center w-full">
                               <span className="text-[10px] font-bold text-slate-300">{dayNum}</span>
@@ -537,27 +530,15 @@ export default function PayrollGenerationView() {
                               <span className={`text-[9px] font-black tracking-wide ${otHours > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                                 {otHours > 0 ? `+${otHours}h` : 'P'}
                               </span>
-                            ) : isPaidOff ? (
-                              <span className="text-[9px] font-black text-sky-400 uppercase tracking-wide">
-                                Off
-                              </span>
-                            ) : isSandwichAbsent ? (
-                              <span className="text-[9px] font-black text-rose-400" title="Sandwich Policy Deduction">
-                                SW
-                              </span>
                             ) : (
-                              <span className="text-[9px] font-black text-slate-500">ABS</span>
+                              <span className="text-[9px] font-black text-rose-400">ABS</span>
                             )}
 
                             {/* HOVER TOOLTIP IN THE CALENDAR BOX */}
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-10 w-44 bg-slate-950 border border-slate-700 p-2.5 rounded-xl text-[10px] text-slate-300 shadow-2xl space-y-1">
                               <div className="font-bold text-white border-b border-slate-800 pb-1 flex justify-between">
                                 <span>Day {dayNum} ({monthsList.find(m => m.value === month)?.label})</span>
-                                <span className={
-                                  isPresent ? 'text-emerald-400' : isPaidOff ? 'text-sky-400' : 'text-rose-400'
-                                }>
-                                  {isPresent ? 'Present' : isPaidOff ? 'Paid Off' : isSandwichAbsent ? 'Sandwiched' : 'Absent'}
-                                </span>
+                                <span className={isPresent ? 'text-emerald-400' : 'text-rose-400'}>{isPresent ? 'Present' : 'Absent'}</span>
                               </div>
                               {isPresent ? (
                                 <>
@@ -565,10 +546,6 @@ export default function PayrollGenerationView() {
                                   <div>Out: {dayData.checkOutTime ? new Date(dayData.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}</div>
                                   {otHours > 0 && <div className="text-amber-400 font-bold">Approved OT: {otHours} hrs</div>}
                                 </>
-                              ) : isPaidOff ? (
-                                <div className="text-[9px] text-sky-300 font-medium">{dayData.label || 'Scheduled Holiday/Off'}</div>
-                              ) : isSandwichAbsent ? (
-                                <div className="text-[9px] text-rose-300 font-medium">{dayData.label || 'Sandwiched rest day'}</div>
                               ) : (
                                 <div className="text-[9px] text-slate-500">No attendance registered.</div>
                               )}
