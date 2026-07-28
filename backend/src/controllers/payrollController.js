@@ -133,11 +133,9 @@ async function getGuardPayrollDetails(req, res) {
 
     // 1. Fetch Guard Info
     const guardRes = await db.query(
-      `SELECT g.id, g.name, g.mobile, p.name AS post_name, s.name AS shift_name,
-              hc.weekly_offs, hc.saturday_policy, hc.sandwich_policy, hc.id AS calendar_id
+      `SELECT g.id, g.name, g.mobile, p.name AS post_name, s.name AS shift_name
        FROM guards g
        LEFT JOIN posts p ON g.assigned_post_id = p.id
-       LEFT JOIN holiday_calendars hc ON p.holiday_calendar_id = hc.id
        LEFT JOIN shifts s ON g.assigned_shift_id = s.id
        WHERE g.id = $1`,
       [guard_id]
