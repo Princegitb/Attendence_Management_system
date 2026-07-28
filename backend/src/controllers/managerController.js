@@ -579,14 +579,14 @@ async function correctAttendance(req, res) {
     }
 
     let finalStatus = status;
-    if (status === 'APPROVED' && oldAtt.rows[0].check_out_time) {
-      // Day already finished → treat as approved checkout (payable).
-      finalStatus = 'CHECKED_OUT';
-    }
-    if (status === 'APPROVED' && scope === 'CHECK_IN_ONLY') {
-      // Manager approved the late check-in only — keep status PENDING_REVIEW
-      // so the dashboard surfaces it again after the day finishes (or now).
-      finalStatus = 'PENDING_REVIEW';
+    if (status === 'APPROVED') {
+      if (!oldAtt.rows[0].check_out_time) {
+        // No checkout yet: Approving late check-in only -> transition to CHECKED_IN
+        finalStatus = 'CHECKED_IN';
+      } else {
+        // Checkout done: Approving completed shift -> transition to APPROVED (Present)
+        finalStatus = 'APPROVED';
+      }
     }
 
     const updatedRes = await db.query(

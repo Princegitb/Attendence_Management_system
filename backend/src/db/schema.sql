@@ -208,3 +208,9 @@ CREATE INDEX IF NOT EXISTS idx_attendance_open_checkouts
   WHERE check_out_time IS NULL
     AND status NOT IN ('REJECTED', 'MISSED_CHECKOUT', 'PENDING_REVIEW');
 
+-- 17. High-performance indexes for payroll query batching
+CREATE INDEX IF NOT EXISTS idx_attendance_guard_date ON attendance(guard_id, date);
+CREATE INDEX IF NOT EXISTS idx_overtime_guard_date ON overtime_records(guard_id, date);
+CREATE INDEX IF NOT EXISTS idx_salary_advances_guard_date ON salary_advances(guard_id, advance_date);
+
+

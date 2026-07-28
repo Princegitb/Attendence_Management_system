@@ -282,6 +282,11 @@ function simulateQuery(text, params) {
 
       if (lowerSql.includes('where guard_id = $1 and date = $2')) {
         res = res.filter(a => String(a.guard_id) === String(params[0]) && a.date === params[1]);
+      } else if (lowerSql.includes('guard_id = any($3::int[])')) {
+        const start = params[0];
+        const end = params[1];
+        const ids = params[2] || [];
+        res = res.filter(a => ids.map(String).includes(String(a.guard_id)) && a.date >= start && a.date <= end);
       } else if (lowerSql.includes('where a.date = $1') || lowerSql.includes('where date = $1')) {
         res = res.filter(a => a.date === params[0]);
         let paramIdx = 1;
@@ -327,7 +332,23 @@ function simulateQuery(text, params) {
 
     if (lowerSql.includes('from salary_advances')) {
       let res = [...inMemoryTables.salary_advances];
-      if (lowerSql.includes('where guard_id = $1')) {
+      if (lowerSql.includes('guard_id = any($3::int[])')) {
+        const start = params[0];
+        const end = params[1];
+        const ids = params[2] || [];
+        // Filter
+        let filtered = res.filter(sa => ids.map(String).includes(String(sa.guard_id)) && sa.advance_date >= start && sa.advance_date <= end);
+        // Group by guard_id
+        const sums = {};
+        filtered.forEach(sa => {
+          sums[sa.guard_id] = (sums[sa.guard_id] || 0) + parseFloat(sa.amount || 0);
+        });
+        const rows = Object.keys(sums).map(gid => ({
+          guard_id: Number(gid),
+          total_advances: sums[gid]
+        }));
+        return { rows, rowCount: rows.length };
+      } else if (lowerSql.includes('where guard_id = $1')) {
         res = res.filter(sa => String(sa.guard_id) === String(params[0]));
       }
       return { rows: res, rowCount: res.length };
@@ -335,7 +356,12 @@ function simulateQuery(text, params) {
 
     if (lowerSql.includes('from overtime_records')) {
       let res = [...inMemoryTables.overtime_records];
-      if (lowerSql.includes('where guard_id = $1')) {
+      if (lowerSql.includes('guard_id = any($3::int[])')) {
+        const start = params[0];
+        const end = params[1];
+        const ids = params[2] || [];
+        res = res.filter(or => ids.map(String).includes(String(or.guard_id)) && or.date >= start && or.date <= end && or.status === 'APPROVED');
+      } else if (lowerSql.includes('where guard_id = $1')) {
         res = res.filter(or => String(or.guard_id) === String(params[0]));
       }
       return { rows: res, rowCount: res.length };

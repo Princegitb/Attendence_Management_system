@@ -435,18 +435,26 @@ async function markCheckOut(req, res) {
     // 5. Upload photo
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 6. Always set CHECKED_OUT on checkout — auto-approved, no manager work.
-    // Late check-outs (overtime) record overtime_minutes and an auto overtime_records row.
-    // Only REJECTED records are preserved (manager already decided on those).
+    // 6. Set status on checkout:
+    // - If currentStatus is CHECKED_IN (on-time check-in or late check-in already approved): Auto-approve to APPROVED.
+    // - If currentStatus is PENDING_REVIEW (late check-in not yet approved): Set to CHECKED_OUT (Checkout Done, awaiting manager review).
+    // - Otherwise, preserve REJECTED.
     const currentStatus = existingAtt.rows[0].status;
-    const newStatus = (currentStatus === 'REJECTED') ? 'REJECTED' : 'CHECKED_OUT';
+    let newStatus = 'CHECKED_OUT';
+    if (currentStatus === 'REJECTED') {
+      newStatus = 'REJECTED';
+    } else if (currentStatus === 'CHECKED_IN') {
+      newStatus = 'APPROVED';
+    } else if (currentStatus === 'PENDING_REVIEW') {
+      newStatus = 'CHECKED_OUT';
+    }
 
     // 6a. Compute overtime minutes beyond shift end (if any)
     let overtimeMinutes = 0;
     let otHours = 0;
     let otRecordId = null;
 
-    if (newStatus === 'CHECKED_OUT' && guard.start_time && guard.end_time) {
+    if (['CHECKED_OUT', 'APPROVED'].includes(newStatus) && guard.start_time && guard.end_time) {
       const { totalMinutes: currentTotalMinutes } = getLocalTimeDetails(serverTimestamp);
       const [endH, endM] = guard.end_time.split(':').map(Number);
       const shiftEndMinutes = endH * 60 + endM;

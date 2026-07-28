@@ -444,34 +444,58 @@ async function calculateMonthlyPayroll(req, res) {
     );
 
     const payrollRows = [];
+    // Batch fetch attendance, overtime, and advances for all active guards
+    const activeGuardIds = guardsRes.rows.map(g => g.id);
+
+    let attRes = { rows: [] };
+    let otRes = { rows: [] };
+    let advRes = { rows: [] };
+
+    if (activeGuardIds.length > 0) {
+      attRes = await db.query(
+        `SELECT guard_id, status FROM attendance
+         WHERE date >= $1 AND date <= $2 AND guard_id = ANY($3::int[])`,
+        [startDateStr, endDateStr, activeGuardIds]
+      );
+
+      otRes = await db.query(
+        `SELECT guard_id, overtime_hours FROM overtime_records
+         WHERE date >= $1 AND date <= $2 AND status = 'APPROVED' AND guard_id = ANY($3::int[])`,
+        [startDateStr, endDateStr, activeGuardIds]
+      );
+
+      advRes = await db.query(
+        `SELECT guard_id, COALESCE(SUM(amount), 0) AS total_advances
+         FROM salary_advances
+         WHERE advance_date >= $1 AND advance_date <= $2 AND guard_id = ANY($3::int[])
+         GROUP BY guard_id`,
+        [startDateStr, endDateStr, activeGuardIds]
+      );
+    }
+
+    // Index data in-memory
+    const attendanceMap = {};
+    attRes.rows.forEach(a => {
+      attendanceMap[a.guard_id] = attendanceMap[a.guard_id] || [];
+      attendanceMap[a.guard_id].push(a);
+    });
+
+    const overtimeMap = {};
+    otRes.rows.forEach(o => {
+      overtimeMap[o.guard_id] = (overtimeMap[o.guard_id] || 0) + parseFloat(o.overtime_hours || 0);
+    });
+
+    const advancesMap = {};
+    advRes.rows.forEach(ad => {
+      advancesMap[ad.guard_id] = parseFloat(ad.total_advances || 0);
+    });
 
     for (const guard of guardsRes.rows) {
-      // 1. Fetch attendance logs for this guard
-      const attRes = await db.query(
-        `SELECT date, status, check_in_time, check_out_time FROM attendance
-         WHERE guard_id = $1 AND date >= $2 AND date <= $3`,
-        [guard.id, startDateStr, endDateStr]
-      );
-
-      // 2. Fetch approved overtime records
-      const otRes = await db.query(
-        `SELECT date, overtime_hours, status FROM overtime_records
-         WHERE guard_id = $1 AND date >= $2 AND date <= $3 AND status = 'APPROVED'`,
-        [guard.id, startDateStr, endDateStr]
-      );
-
-      // 3. Count Advances taken in this month
-      const advRes = await db.query(
-        `SELECT COALESCE(SUM(amount), 0) AS total_advances
-         FROM salary_advances
-         WHERE guard_id = $1 AND advance_date >= $2 AND advance_date <= $3`,
-        [guard.id, startDateStr, endDateStr]
-      );
-      const totalAdvances = parseFloat(advRes.rows[0].total_advances);
-
-      const presentDays = attRes.rows.filter(a => a.status === 'APPROVED').length;
+      const guardAtt = attendanceMap[guard.id] || [];
+      const presentDays = guardAtt.filter(a => a.status === 'APPROVED').length;
       const absentDays = daysInMonth - presentDays;
-      const totalOtHours = otRes.rows.reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
+      const totalOtHours = overtimeMap[guard.id] || 0;
+      const totalAdvances = advancesMap[guard.id] || 0;
 
       // Calculate final salary breakdown
       const calculation = calculateSalary({
