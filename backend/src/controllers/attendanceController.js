@@ -435,34 +435,58 @@ async function markCheckOut(req, res) {
     // 5. Upload photo
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 6. Set status on checkout:
-    // - If currentStatus is CHECKED_IN (on-time check-in or late check-in already approved): Auto-approve to APPROVED.
-    // - If currentStatus is PENDING_REVIEW (late check-in not yet approved): Set to CHECKED_OUT (Checkout Done, awaiting manager review).
+    // 6. Construct expected shift start and end times in local timezone
+    const [startH, startM, startS] = guard.start_time.split(':').map(Number);
+    const [endH, endM, endS] = guard.end_time.split(':').map(Number);
+
+    // Expected shift start is on the logical shift date
+    const expectedShiftStart = new Date(`${today}T${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:${String(startS || 0).padStart(2, '0')}`);
+    
+    // Expected shift end
+    let expectedShiftEnd = new Date(`${today}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS || 0).padStart(2, '0')}`);
+    
+    // If shift end time is less than start time, it's an overnight shift (ends on the next calendar day)
+    const startTotalMin = startH * 60 + startM;
+    const endTotalMin = endH * 60 + endM;
+    if (endTotalMin < startTotalMin) {
+      expectedShiftEnd.setDate(expectedShiftEnd.getDate() + 1);
+    }
+
+    // 6a. Early checkout safety check:
+    // If check-out is more than 30 minutes before expected shift end, flag it for Manager review.
+    const checkoutTimeObj = new Date(serverTimestamp);
+    const earlyCheckoutThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const isEarlyCheckout = checkoutTimeObj < new Date(expectedShiftEnd.getTime() - earlyCheckoutThresholdMs);
+
+    // 6b. Set status on checkout:
+    // - If currentStatus is CHECKED_IN (on-time check-in or approved late check-in):
+    //   - If early checkout -> Set to PENDING_REVIEW (flag for manager review).
+    //   - If on time -> Auto-approve to APPROVED.
+    // - If currentStatus is PENDING_REVIEW (late check-in not yet approved): Set to CHECKED_OUT.
     // - Otherwise, preserve REJECTED.
     const currentStatus = existingAtt.rows[0].status;
     let newStatus = 'CHECKED_OUT';
     if (currentStatus === 'REJECTED') {
       newStatus = 'REJECTED';
     } else if (currentStatus === 'CHECKED_IN') {
-      newStatus = 'APPROVED';
+      if (isEarlyCheckout) {
+        newStatus = 'PENDING_REVIEW';
+      } else {
+        newStatus = 'APPROVED';
+      }
     } else if (currentStatus === 'PENDING_REVIEW') {
       newStatus = 'CHECKED_OUT';
     }
 
-    // 6a. Compute overtime minutes beyond shift end (if any)
+    // 6c. Compute overtime minutes beyond shift end (if checkout is past expected shift end)
     let overtimeMinutes = 0;
     let otHours = 0;
     let otRecordId = null;
 
-    if (['CHECKED_OUT', 'APPROVED'].includes(newStatus) && guard.start_time && guard.end_time) {
-      const { totalMinutes: currentTotalMinutes } = getLocalTimeDetails(serverTimestamp);
-      const [endH, endM] = guard.end_time.split(':').map(Number);
-      const shiftEndMinutes = endH * 60 + endM;
-      if (currentTotalMinutes > shiftEndMinutes) {
-        overtimeMinutes = currentTotalMinutes - shiftEndMinutes;
-        otHours = +(overtimeMinutes / 60).toFixed(2);
-      }
-      // Early checkout → no negative overtime; stays 0.
+    if (['CHECKED_OUT', 'APPROVED'].includes(newStatus) && checkoutTimeObj > expectedShiftEnd) {
+      const diffMs = checkoutTimeObj - expectedShiftEnd;
+      overtimeMinutes = Math.floor(diffMs / (60 * 1000));
+      otHours = +(overtimeMinutes / 60).toFixed(2);
     }
 
     // 7. Persist checkout with overtime_minutes
