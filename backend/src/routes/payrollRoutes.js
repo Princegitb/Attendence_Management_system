@@ -25,6 +25,7 @@ router.put('/overtime/:id/approve', payrollController.approveOvertime);
 
 // Calculations & Payroll runs
 router.get('/calculate', payrollController.calculateMonthlyPayroll);
+router.get('/guard-detail', payrollController.getGuardPayrollDetails);
 router.post('/generate', payrollController.generatePayroll);
 router.get('/history', payrollController.getPayrollHistory);
 router.get('/details/:id', payrollController.getPayrollDetails);

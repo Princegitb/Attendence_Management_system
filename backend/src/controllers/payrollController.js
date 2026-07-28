@@ -118,6 +118,90 @@ async function bulkUpdateConfigurations(req, res) {
   }
 }
 
+async function getGuardPayrollDetails(req, res) {
+  try {
+    const { guard_id, month, year } = req.query;
+    if (!guard_id || !month || !year) {
+      return res.status(400).json({ success: false, message: 'Guard ID, Month, and Year are required.' });
+    }
+
+    const monthNum = parseInt(month, 10);
+    const yearNum = parseInt(year, 10);
+    const daysInMonth = getDaysInMonth(yearNum, monthNum);
+    const startDateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+    const endDateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${daysInMonth}`;
+
+    // 1. Fetch Guard Info
+    const guardRes = await db.query(
+      `SELECT g.id, g.name, g.mobile, p.name AS post_name, s.name AS shift_name
+       FROM guards g
+       LEFT JOIN posts p ON g.assigned_post_id = p.id
+       LEFT JOIN shifts s ON g.assigned_shift_id = s.id
+       WHERE g.id = $1`,
+      [guard_id]
+    );
+
+    if (guardRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Guard not found.' });
+    }
+
+    const guard = guardRes.rows[0];
+
+    // 2. Fetch Salary Config
+    const configRes = await db.query(
+      `SELECT * FROM salary_configurations WHERE guard_id = $1`,
+      [guard_id]
+    );
+    const config = configRes.rows[0] || null;
+
+    // 3. Fetch Attendance Logs for this month
+    const attRes = await db.query(
+      `SELECT a.id, a.date, a.check_in_time, a.check_out_time, a.status,
+              a.check_in_distance_from_post
+       FROM attendance a
+       WHERE a.guard_id = $1 AND a.date >= $2 AND a.date <= $3
+       ORDER BY a.date ASC`,
+      [guard_id, startDateStr, endDateStr]
+    );
+
+    // 4. Fetch Overtime records for this month
+    const otRes = await db.query(
+      `SELECT * FROM overtime_records
+       WHERE guard_id = $1 AND date >= $2 AND date <= $3`,
+      [guard_id, startDateStr, endDateStr]
+    );
+
+    // Calculate Summary
+    const presentDays = attRes.rows.filter(r => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(r.status)).length;
+    const absentDays = Math.max(0, daysInMonth - presentDays);
+    const approvedOtHours = otRes.rows.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + parseFloat(r.overtime_hours), 0);
+
+    const calculation = config ? calculateSalary({
+      salaryType: config.salary_type,
+      basicSalary: config.basic_salary,
+      otRatePerHour: config.ot_rate_per_hour,
+      isOtEligible: config.is_ot_eligible,
+      presentDays,
+      absentDays,
+      totalApprovedOtHours: approvedOtHours,
+      totalAdvances: 0,
+      daysInMonth
+    }) : null;
+
+    return res.json({
+      success: true,
+      guard,
+      config,
+      attendance: attRes.rows,
+      overtime: otRes.rows,
+      daysInMonth,
+      summary: calculation
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 // ==========================================
 // 2. SALARY ADVANCE MANAGEMENT
 // ==========================================
@@ -527,6 +611,7 @@ module.exports = {
   getConfigurations,
   updateConfiguration,
   bulkUpdateConfigurations,
+  getGuardPayrollDetails,
   getAdvances,
   createAdvance,
   updateAdvance,
