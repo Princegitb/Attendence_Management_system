@@ -21,6 +21,17 @@ const formatTime12h = (timeVal) => {
   return String(timeVal);
 };
 
+// Render minutes as "Xh Ym" if ≥ 60 min, otherwise just "Ym".
+// Examples: 30 → "30m", 75 → "1h 15m", 286 → "4h 46m".
+const formatDuration = (totalMinutes) => {
+  const m = Number(totalMinutes) || 0;
+  if (m <= 0) return '0m';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+};
+
 export default function AttendanceView() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [officerId, setOfficerId] = useState('');
@@ -313,12 +324,12 @@ export default function AttendanceView() {
                         </span>
                         {Number(rec.late_by_minutes) > 0 && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/30">
-                            Late {rec.late_by_minutes}m
+                            Late {formatDuration(rec.late_by_minutes)}
                           </span>
                         )}
                         {Number(rec.overtime_minutes) > 0 && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-indigo-500/10 text-indigo-400 border-indigo-500/30">
-                            OT +{rec.overtime_minutes}m
+                            OT +{formatDuration(rec.overtime_minutes)}
                           </span>
                         )}
                       </div>

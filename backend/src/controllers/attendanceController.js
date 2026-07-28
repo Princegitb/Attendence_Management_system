@@ -487,6 +487,16 @@ async function markCheckOut(req, res) {
       otRecordId = otInsert.rows[0].id;
     }
 
+    // Render overtime as "Xh Ym" when ≥ 60 min, otherwise "Ym".
+    const formatOvertime = (totalMin) => {
+      if (!totalMin || totalMin <= 0) return '0m';
+      if (totalMin < 60) return `${totalMin}m`;
+      const h = Math.floor(totalMin / 60);
+      const rem = totalMin % 60;
+      return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+    };
+    const otLabel = formatOvertime(overtimeMinutes);
+
     await logAuditEvent({
       action: 'GUARD_CHECK_OUT',
       performedBy: req.user.name,
@@ -494,13 +504,13 @@ async function markCheckOut(req, res) {
       targetType: 'Guard',
       targetId: guard.id,
       reason: `Guard ${guard.name} checked out (${distanceMeters}m from post). Status: ${newStatus}` +
-              (overtimeMinutes > 0 ? `, Overtime: ${overtimeMinutes} min (auto-approved)` : '')
+              (overtimeMinutes > 0 ? `, Overtime: ${otLabel} (auto-approved)` : '')
     });
 
     return res.json({
       success: true,
       message: overtimeMinutes > 0
-        ? `Check-out recorded for ${guard.name}. Overtime: ${overtimeMinutes} min (auto-approved).`
+        ? `Check-out recorded for ${guard.name}. Overtime: ${otLabel} (auto-approved).`
         : `Check-out recorded for ${guard.name} successfully.`,
       data: {
         attendanceId: updateRes.rows[0].id,

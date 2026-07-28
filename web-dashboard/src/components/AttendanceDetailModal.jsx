@@ -3,6 +3,17 @@ import { X, MapPin, Camera, Clock, UserCheck, ShieldCheck, AlertCircle, Maximize
 import { api } from '../services/api';
 import ConfirmActionModal from './ConfirmActionModal';
 
+// Render minutes as "Xh Ym" if ≥ 60 min, otherwise just "Ym".
+// Examples: 30 → "30m", 75 → "1h 15m", 286 → "4h 46m".
+const formatDuration = (totalMinutes) => {
+  const m = Number(totalMinutes) || 0;
+  if (m <= 0) return '0m';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+};
+
 export default function AttendanceDetailModal({ record, onClose, onCorrect, onUpdate }) {
   const [expandedPhoto, setExpandedPhoto] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -92,12 +103,12 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
                 <div className="flex items-center gap-1.5 flex-wrap pt-1">
                   {Number(record.late_by_minutes) > 0 && (
                     <span className="text-[10px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full font-bold">
-                      Late {record.late_by_minutes} min
+                      Late {formatDuration(record.late_by_minutes)}
                     </span>
                   )}
                   {Number(record.overtime_minutes) > 0 && (
                     <span className="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-full font-bold">
-                      OT +{record.overtime_minutes} min
+                      OT +{formatDuration(record.overtime_minutes)}
                     </span>
                   )}
                 </div>
