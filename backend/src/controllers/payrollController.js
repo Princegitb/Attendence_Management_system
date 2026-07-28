@@ -192,7 +192,7 @@ async function getGuardPayrollDetails(req, res) {
     const attendanceMap = Array.from({ length: daysInMonth }).map((_, index) => {
       const dayNum = index + 1;
       const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-      const att = attRes.rows.find(a => a.date.split('T')[0] === dateStr);
+      const att = attRes.rows.find(a => new Date(a.date).toISOString().split('T')[0] === dateStr);
       
       let dayStatus = 'ABSENT';
       let dayLabel = 'Absent';
@@ -217,7 +217,7 @@ async function getGuardPayrollDetails(req, res) {
       
       return {
         status: dayStatus,
-        otHours: otRes.rows.find(ot => ot.date.split('T')[0] === dateStr && ot.status === 'APPROVED')?.overtime_hours || 0,
+        otHours: otRes.rows.find(ot => new Date(ot.date).toISOString().split('T')[0] === dateStr && ot.status === 'APPROVED')?.overtime_hours || 0,
         checkInTime: att ? att.check_in_time : null,
         checkOutTime: att ? att.check_out_time : null,
         label: dayLabel
