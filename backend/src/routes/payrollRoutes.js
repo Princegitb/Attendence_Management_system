@@ -10,6 +10,7 @@ router.use(requireRole('MANAGER'));
 // Salary Configs
 router.get('/configurations', payrollController.getConfigurations);
 router.post('/configurations', payrollController.updateConfiguration);
+router.post('/configurations/bulk', payrollController.bulkUpdateConfigurations);
 
 // Advances CRUD
 router.get('/advances', payrollController.getAdvances);

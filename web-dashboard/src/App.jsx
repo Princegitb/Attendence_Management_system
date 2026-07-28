@@ -12,7 +12,6 @@ import ShiftsView from './views/ShiftsView';
 import ReportsView from './views/ReportsView';
 import AuditLogsView from './views/AuditLogsView';
 import PayrollConfigView from './views/PayrollConfigView';
-import AdvancesView from './views/AdvancesView';
 import PayrollGenerationView from './views/PayrollGenerationView';
 import { getCurrentUser, logout } from './services/api';
 
@@ -54,7 +53,6 @@ export default function App() {
           {activeTab === 'reports' && <ReportsView />}
           {activeTab === 'audit-logs' && <AuditLogsView />}
           {activeTab === 'payroll-config' && <PayrollConfigView />}
-          {activeTab === 'payroll-advances' && <AdvancesView />}
           {activeTab === 'payroll-run' && <PayrollGenerationView />}
         </main>
       </div>

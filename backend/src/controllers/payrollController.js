@@ -70,6 +70,54 @@ async function updateConfiguration(req, res) {
   }
 }
 
+async function bulkUpdateConfigurations(req, res) {
+  try {
+    const { salary_type, basic_salary, ot_rate_per_hour, is_ot_eligible } = req.body;
+
+    if (!salary_type) {
+      return res.status(400).json({ success: false, message: 'Salary Type is required.' });
+    }
+
+    // 1. Get all active guards
+    const guardsRes = await db.query(`SELECT id FROM guards WHERE status = 'ACTIVE'`);
+    const guardIds = guardsRes.rows.map(g => g.id);
+
+    if (guardIds.length === 0) {
+      return res.json({ success: true, message: 'No active guards found to configure.' });
+    }
+
+    // 2. Perform bulk insertion/updating (handling compatibility for PostgreSQL and mock)
+    for (const guardId of guardIds) {
+      const checkRes = await db.query(`SELECT id FROM salary_configurations WHERE guard_id = $1`, [guardId]);
+      if (checkRes.rows.length > 0) {
+        await db.query(
+          `UPDATE salary_configurations
+           SET salary_type = $2, basic_salary = $3, ot_rate_per_hour = $4, is_ot_eligible = $5, updated_at = CURRENT_TIMESTAMP
+           WHERE guard_id = $1`,
+          [guardId, salary_type, basic_salary || 0.00, ot_rate_per_hour || 0.00, is_ot_eligible || false]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO salary_configurations (guard_id, salary_type, basic_salary, ot_rate_per_hour, is_ot_eligible)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [guardId, salary_type, basic_salary || 0.00, ot_rate_per_hour || 0.00, is_ot_eligible || false]
+        );
+      }
+    }
+
+    await logAuditEvent({
+      action: 'BULK_UPDATE_SALARY_CONFIG',
+      performedBy: req.user.name,
+      performedByRole: req.user.role,
+      reason: `Bulk configured all ${guardIds.length} guards: Type=${salary_type}, Salary=${basic_salary}`
+    });
+
+    return res.json({ success: true, message: `Successfully updated configurations for all ${guardIds.length} active guards.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 // ==========================================
 // 2. SALARY ADVANCE MANAGEMENT
 // ==========================================
@@ -478,6 +526,7 @@ async function getPayrollDetails(req, res) {
 module.exports = {
   getConfigurations,
   updateConfiguration,
+  bulkUpdateConfigurations,
   getAdvances,
   createAdvance,
   updateAdvance,

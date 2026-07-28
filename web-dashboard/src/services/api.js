@@ -189,6 +189,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+  bulkUpdatePayrollConfig: (data) => request('/payroll/configurations/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
   getAdvances: (guardId) => request(`/payroll/advances?guard_id=${guardId || ''}`),
   createAdvance: (data) => request('/payroll/advances', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DollarSign, Edit3, Save, X, ShieldAlert } from 'lucide-react';
+import { DollarSign, Edit3, Save, X, Settings, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function PayrollConfigView() {
@@ -7,11 +7,18 @@ export default function PayrollConfigView() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   
-  // Edit form state
+  // Individual Edit form state
   const [salaryType, setSalaryType] = useState('DAILY');
   const [basicSalary, setBasicSalary] = useState('');
   const [otRatePerHour, setOtRatePerHour] = useState('');
   const [isOtEligible, setIsOtEligible] = useState(false);
+
+  // Global Default Config Form State
+  const [globalSalaryType, setGlobalSalaryType] = useState('DAILY');
+  const [globalBasicSalary, setGlobalBasicSalary] = useState('1000');
+  const [globalOtRate, setGlobalOtRate] = useState('150');
+  const [globalOtEligible, setGlobalOtEligible] = useState(true);
+  const [globalLoading, setGlobalLoading] = useState(false);
 
   const loadConfigs = async () => {
     setLoading(true);
@@ -64,16 +71,117 @@ export default function PayrollConfigView() {
     }
   };
 
+  const applyGlobalConfig = async (e) => {
+    e.preventDefault();
+    if (!window.confirm(`Are you sure you want to apply this default salary setup to ALL active guards? This will overwrite their current settings.`)) {
+      return;
+    }
+
+    setGlobalLoading(true);
+    try {
+      const res = await api.bulkUpdatePayrollConfig({
+        salary_type: globalSalaryType,
+        basic_salary: parseFloat(globalBasicSalary || 0),
+        ot_rate_per_hour: parseFloat(globalOtRate || 0),
+        is_ot_eligible: globalOtEligible
+      });
+
+      if (res.success) {
+        alert(res.message || 'Global configurations applied successfully!');
+        loadConfigs();
+      } else {
+        alert(res.message || 'Failed to apply global configuration');
+      }
+    } catch (err) {
+      alert(err.message || 'Error applying default settings');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-          Salary Configurations <DollarSign className="w-5 h-5 text-sky-400" />
+          Salary configurations <DollarSign className="w-5 h-5 text-sky-400" />
         </h2>
         <p className="text-xs text-slate-400">Configure salary types, basic wages, and overtime eligibility for all guards.</p>
       </div>
 
+      {/* Quick Salary Configuration Card (Common for All) */}
+      <form onSubmit={applyGlobalConfig} className="bg-slate-800/60 p-6 rounded-3xl border border-slate-700/60 space-y-4 max-w-4xl shadow-xl">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <Settings className="w-4 h-4 text-sky-400" /> Quick Configure Default Salary (Common for All)
+        </h3>
+        <p className="text-xs text-slate-400">Apply a default salary configuration to all guards instantly instead of setting them up individually.</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-300 mb-1">Salary Type</label>
+            <select
+              value={globalSalaryType}
+              onChange={(e) => setGlobalSalaryType(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+            >
+              <option value="DAILY">DAILY WAGE</option>
+              <option value="MONTHLY">MONTHLY BASE</option>
+              <option value="HOURLY">HOURLY WAGE</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-300 mb-1">Basic Salary / Daily Wage (₹)</label>
+            <input
+              type="number"
+              value={globalBasicSalary}
+              onChange={(e) => setGlobalBasicSalary(e.target.value)}
+              required
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 sm:pt-6">
+            <input
+              type="checkbox"
+              id="globalOtEligible"
+              checked={globalOtEligible}
+              onChange={(e) => setGlobalOtEligible(e.target.checked)}
+              className="w-4 h-4 rounded text-sky-500 bg-slate-900 border-slate-700"
+            />
+            <label htmlFor="globalOtEligible" className="text-xs font-semibold text-slate-300 select-none cursor-pointer">
+              OT Eligible
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-300 mb-1">OT Rate / Hour (₹)</label>
+            <input
+              type="number"
+              value={globalOtRate}
+              disabled={!globalOtEligible}
+              onChange={(e) => setGlobalOtRate(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none disabled:opacity-40"
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-slate-700/40 pt-4 flex justify-end">
+          <button
+            type="submit"
+            disabled={globalLoading}
+            className="px-6 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {globalLoading ? 'Applying Defaults...' : 'Apply Default Settings to All Active Guards'}
+          </button>
+        </div>
+      </form>
+
+      {/* Roster Config List */}
       <div className="bg-slate-800/50 border border-slate-700/60 rounded-3xl overflow-hidden shadow-xl">
+        <div className="p-4 border-b border-slate-700/40 bg-slate-900/40">
+          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Guard Configuration Detail Roster</h3>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
@@ -197,7 +305,7 @@ export default function PayrollConfigView() {
                             onClick={() => startEdit(row)}
                             className="px-2.5 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
                           >
-                            <Edit3 className="w-3.5 h-3.5" /> Configure
+                            <Edit3 className="w-3.5 h-3.5" /> Modify
                           </button>
                         )}
                       </td>
