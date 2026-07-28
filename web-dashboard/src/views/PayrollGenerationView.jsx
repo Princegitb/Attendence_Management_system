@@ -491,10 +491,21 @@ export default function PayrollGenerationView() {
                     </h4>
 
                     {/* Renders a grid of days 1 to DaysInMonth */}
-                    <div className="grid grid-cols-5 sm:grid-cols-7 gap-2.5 bg-slate-950/40 p-4 rounded-2xl border border-slate-700/40">
+                    <div className="grid grid-cols-7 gap-2 bg-slate-950/40 p-4 rounded-2xl border border-slate-700/40">
+                      {/* Weekday Headers */}
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                        <div key={d} className="text-center font-bold text-[9px] text-slate-500 py-1 uppercase">{d}</div>
+                      ))}
+
+                      {/* Spacer Blocks for Day 1 Alignment */}
+                      {Array.from({ length: new Date(year, month - 1, 1).getDay() }).map((_, idx) => (
+                        <div key={`empty-${idx}`} className="h-14 opacity-0"></div>
+                      ))}
+
                       {Array.from({ length: slipData.daysInMonth }).map((_, index) => {
                         const dayNum = index + 1;
                         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                        const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(year, month - 1, dayNum).getDay()];
                         
                         // Check if present
                         const attendance = slipData.attendance.find(a => a.date.split('T')[0] === dateStr);
@@ -507,7 +518,7 @@ export default function PayrollGenerationView() {
                         return (
                           <div
                             key={dayNum}
-                            className={`p-2 rounded-xl border flex flex-col items-center justify-between h-14 min-w-[50px] relative group transition-all ${
+                            className={`p-2 rounded-xl border flex flex-col items-center justify-between h-14 min-w-[45px] relative group transition-all ${
                               isPresent
                                 ? otHours > 0
                                   ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
@@ -515,7 +526,10 @@ export default function PayrollGenerationView() {
                                 : 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20'
                             }`}
                           >
-                            <span className="text-[10px] font-bold text-slate-400">{dayNum}</span>
+                            <div className="flex justify-between items-center w-full">
+                              <span className="text-[10px] font-bold text-slate-300">{dayNum}</span>
+                              <span className="text-[8px] text-slate-500 uppercase tracking-tight">{dayOfWeek}</span>
+                            </div>
                             
                             {isPresent ? (
                               <span className={`text-[9px] font-black tracking-wide ${otHours > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
