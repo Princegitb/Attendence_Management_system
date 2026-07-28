@@ -684,6 +684,26 @@ function simulateQuery(text, params) {
       const deletedCount = initialLen - inMemoryTables.field_officers.length;
       return { rows: [], rowCount: deletedCount };
     }
+    if (lowerSql.includes('overtime_records')) {
+      const initialLen = inMemoryTables.overtime_records.length;
+      inMemoryTables.overtime_records = inMemoryTables.overtime_records.filter(ot => {
+        if (lowerSql.includes('attendance_id = $1')) {
+          return String(ot.attendance_id) !== String(params[0]);
+        }
+        if (lowerSql.includes('guard_id = $1')) {
+          return String(ot.guard_id) !== String(params[0]);
+        }
+        return true;
+      });
+      const deletedCount = initialLen - inMemoryTables.overtime_records.length;
+      return { rows: [], rowCount: deletedCount };
+    }
+    if (lowerSql.includes('attendance')) {
+      const initialLen = inMemoryTables.attendance.length;
+      inMemoryTables.attendance = inMemoryTables.attendance.filter(a => String(a.id) !== String(params[0]));
+      const deletedCount = initialLen - inMemoryTables.attendance.length;
+      return { rows: [], rowCount: deletedCount };
+    }
   }
 
   return { rows: [], rowCount: 0 };

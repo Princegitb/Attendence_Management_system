@@ -164,10 +164,12 @@ async function getGuardPayrollDetails(req, res) {
       [guard_id, startDateStr, endDateStr]
     );
 
-    // 4. Fetch Overtime records for this month
+    // 4. Fetch Overtime records for this month (only count if not linked to a deleted/rejected attendance)
     const otRes = await db.query(
-      `SELECT * FROM overtime_records
-       WHERE guard_id = $1 AND date >= $2 AND date <= $3`,
+      `SELECT ot.* FROM overtime_records ot
+       LEFT JOIN attendance a ON ot.attendance_id = a.id
+       WHERE ot.guard_id = $1 AND ot.date >= $2 AND ot.date <= $3
+         AND (ot.attendance_id IS NULL OR (a.status IS NOT NULL AND a.status IN ('APPROVED', 'CHECKED_IN', 'CHECKED_OUT')))`,
       [guard_id, startDateStr, endDateStr]
     );
 
@@ -459,8 +461,10 @@ async function calculateMonthlyPayroll(req, res) {
       );
 
       otRes = await db.query(
-        `SELECT guard_id, overtime_hours FROM overtime_records
-         WHERE date >= $1 AND date <= $2 AND status = 'APPROVED' AND guard_id = ANY($3::int[])`,
+        `SELECT ot.guard_id, ot.overtime_hours FROM overtime_records ot
+         LEFT JOIN attendance a ON ot.attendance_id = a.id
+         WHERE ot.date >= $1 AND ot.date <= $2 AND ot.status = 'APPROVED' AND ot.guard_id = ANY($3::int[])
+           AND (ot.attendance_id IS NULL OR (a.status IS NOT NULL AND a.status IN ('APPROVED', 'CHECKED_IN', 'CHECKED_OUT')))`,
         [startDateStr, endDateStr, activeGuardIds]
       );
 
