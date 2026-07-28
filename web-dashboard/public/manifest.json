@@ -1,0 +1,22 @@
+{
+  "short_name": "Guard Attendance",
+  "name": "Guard Attendance Management System",
+  "icons": [
+    {
+      "src": "/shield.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/shield.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090d16",
+  "theme_color": "#0ea5e9",
+  "display": "standalone",
+  "orientation": "portrait"
+}
