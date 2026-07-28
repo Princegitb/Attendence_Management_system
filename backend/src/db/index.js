@@ -22,7 +22,10 @@ const inMemoryTables = {
   salary_advances: [],
   overtime_records: [],
   payrolls: [],
-  payroll_details: []
+  payroll_details: [],
+  holiday_calendars: [],
+  calendar_holidays: [],
+  floating_holiday_requests: []
 };
 
 let autoIncrementIds = {
@@ -38,7 +41,10 @@ let autoIncrementIds = {
   salary_advances: 1,
   overtime_records: 1,
   payrolls: 1,
-  payroll_details: 1
+  payroll_details: 1,
+  holiday_calendars: 1,
+  calendar_holidays: 1,
+  floating_holiday_requests: 1
 };
 
 try {
@@ -350,6 +356,26 @@ function simulateQuery(text, params) {
       let res = [...inMemoryTables.payroll_details];
       return { rows: res, rowCount: res.length };
     }
+    if (lowerSql.includes('from holiday_calendars')) {
+      let res = [...inMemoryTables.holiday_calendars];
+      if (lowerSql.includes('where id = $1')) {
+        res = res.filter(c => String(c.id) === String(params[0]));
+      }
+      return { rows: res, rowCount: res.length };
+    }
+
+    if (lowerSql.includes('from calendar_holidays')) {
+      let res = [...inMemoryTables.calendar_holidays];
+      if (lowerSql.includes('where calendar_id = $1')) {
+        res = res.filter(ch => String(ch.calendar_id) === String(params[0]));
+      }
+      return { rows: res, rowCount: res.length };
+    }
+
+    if (lowerSql.includes('from floating_holiday_requests')) {
+      let res = [...inMemoryTables.floating_holiday_requests];
+      return { rows: res, rowCount: res.length };
+    }
   }
 
   // Handle INSERT
@@ -569,6 +595,49 @@ function simulateQuery(text, params) {
         created_at: new Date()
       };
       inMemoryTables.payroll_details.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('holiday_calendars')) {
+      const newObj = {
+        id: autoIncrementIds.holiday_calendars++,
+        name: params[0],
+        year: params[1],
+        weekly_offs: params[2] || [],
+        saturday_policy: params[3] || 'ALL_WORKING',
+        sandwich_policy: params[4] || false,
+        is_published: params[5] || false,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      inMemoryTables.holiday_calendars.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('calendar_holidays')) {
+      const newObj = {
+        id: autoIncrementIds.calendar_holidays++,
+        calendar_id: params[0],
+        date: params[1],
+        name: params[2],
+        type: params[3],
+        created_at: new Date()
+      };
+      inMemoryTables.calendar_holidays.push(newObj);
+      return { rows: [newObj], rowCount: 1 };
+    }
+
+    if (lowerSql.includes('floating_holiday_requests')) {
+      const newObj = {
+        id: autoIncrementIds.floating_holiday_requests++,
+        guard_id: params[0],
+        date: params[1],
+        holiday_id: params[2],
+        status: params[3] || 'PENDING',
+        approved_by: params[4] || null,
+        created_at: new Date()
+      };
+      inMemoryTables.floating_holiday_requests.push(newObj);
       return { rows: [newObj], rowCount: 1 };
     }
   }
