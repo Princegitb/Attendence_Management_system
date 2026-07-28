@@ -263,15 +263,25 @@ export default function AttendanceView() {
                     <td className="p-3.5 text-sky-400 font-medium">{rec.marked_by_officer}</td>
                     <td className="p-3.5">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        rec.status === 'APPROVED' || rec.status === 'CHECKED_OUT'
+                        rec.status === 'APPROVED'
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                           : rec.status === 'PENDING_REVIEW'
                           ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse'
+                          : rec.status === 'CHECKED_IN'
+                          ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                          : rec.status === 'CHECKED_OUT'
+                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
                           : rec.status === 'REJECTED'
                           ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                          : 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                          : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
                       }`}>
-                        {rec.status === 'PENDING_REVIEW' ? 'PENDING REVIEW (LATE)' : rec.status}
+                        {rec.status === 'PENDING_REVIEW' 
+                          ? 'PENDING REVIEW' 
+                          : rec.status === 'CHECKED_IN' 
+                          ? 'CHECKIN DONE' 
+                          : rec.status === 'CHECKED_OUT' 
+                          ? 'CHECKOUT DONE' 
+                          : rec.status}
                       </span>
                     </td>
                     <td className="p-3.5 text-right space-x-1.5">
@@ -294,7 +304,26 @@ export default function AttendanceView() {
                         </>
                       )}
 
-                      {rec.status !== 'PENDING_REVIEW' && rec.status !== 'REJECTED' && (
+                      {rec.status === 'CHECKED_OUT' && (
+                        <>
+                          <button
+                            onClick={() => promptStatusConfirmation(rec.id, 'APPROVED', rec.guard_name, 'Approved by Manager')}
+                            title="Approve Attendance"
+                            className="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                          </button>
+                          <button
+                            onClick={() => promptStatusConfirmation(rec.id, 'REJECTED', rec.guard_name, 'Rejected by Manager')}
+                            title="Reject Attendance"
+                            className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </button>
+                        </>
+                      )}
+
+                      {rec.status === 'APPROVED' && (
                         <button
                           onClick={() => promptStatusConfirmation(rec.id, 'REJECTED', rec.guard_name, 'Manually rejected by Manager')}
                           title="Reject Attendance"

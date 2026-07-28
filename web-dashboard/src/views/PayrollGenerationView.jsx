@@ -507,18 +507,44 @@ export default function PayrollGenerationView() {
                         const dayData = slipData.attendance[index] || { status: 'ABSENT', otHours: 0 };
                         const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(year, month - 1, dayNum).getDay()];
                         
-                        const isPresent = dayData.status === 'PRESENT';
+                        const status = dayData.status;
                         const otHours = parseFloat(dayData.otHours || 0);
+
+                        // Color scheme per status
+                        const statusStyles = {
+                          'PRESENT': otHours > 0
+                            ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
+                            : 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20',
+                          'CHECKED_IN': 'bg-sky-500/10 border-sky-500/30 hover:bg-sky-500/20',
+                          'CHECKED_OUT': 'bg-indigo-500/10 border-indigo-500/30 hover:bg-indigo-500/20',
+                          'PENDING': 'bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20',
+                          'REJECTED': 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20',
+                          'ABSENT': 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20',
+                        };
+
+                        const badgeLabel = {
+                          'PRESENT': otHours > 0 ? `+${otHours}h` : 'P',
+                          'CHECKED_IN': 'CI',
+                          'CHECKED_OUT': 'CO',
+                          'PENDING': 'PR',
+                          'REJECTED': 'REJ',
+                          'ABSENT': 'ABS',
+                        };
+
+                        const badgeColor = {
+                          'PRESENT': otHours > 0 ? 'text-amber-400' : 'text-emerald-400',
+                          'CHECKED_IN': 'text-sky-400',
+                          'CHECKED_OUT': 'text-indigo-400',
+                          'PENDING': 'text-amber-400',
+                          'REJECTED': 'text-rose-400',
+                          'ABSENT': 'text-rose-400',
+                        };
 
                         return (
                           <div
                             key={dayNum}
                             className={`p-2 rounded-xl border flex flex-col items-center justify-between h-14 min-w-[45px] relative group transition-all ${
-                              isPresent
-                                ? otHours > 0
-                                  ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
-                                  : 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20'
-                                : 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20'
+                              statusStyles[status] || statusStyles['ABSENT']
                             }`}
                           >
                             <div className="flex justify-between items-center w-full">
@@ -526,25 +552,22 @@ export default function PayrollGenerationView() {
                               <span className="text-[8px] text-slate-500 uppercase tracking-tight">{dayOfWeek}</span>
                             </div>
                             
-                            {isPresent ? (
-                              <span className={`text-[9px] font-black tracking-wide ${otHours > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                {otHours > 0 ? `+${otHours}h` : 'P'}
-                              </span>
-                            ) : (
-                              <span className="text-[9px] font-black text-rose-400">ABS</span>
-                            )}
+                            <span className={`text-[9px] font-black tracking-wide ${badgeColor[status] || 'text-slate-400'}`}>
+                              {badgeLabel[status] || 'ABS'}
+                            </span>
 
                             {/* HOVER TOOLTIP IN THE CALENDAR BOX */}
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-10 w-44 bg-slate-950 border border-slate-700 p-2.5 rounded-xl text-[10px] text-slate-300 shadow-2xl space-y-1">
                               <div className="font-bold text-white border-b border-slate-800 pb-1 flex justify-between">
                                 <span>Day {dayNum} ({monthsList.find(m => m.value === month)?.label})</span>
-                                <span className={isPresent ? 'text-emerald-400' : 'text-rose-400'}>{isPresent ? 'Present' : 'Absent'}</span>
+                                <span className={badgeColor[status] || 'text-slate-400'}>{dayData.label || 'Absent'}</span>
                               </div>
-                              {isPresent ? (
+                              {status !== 'ABSENT' ? (
                                 <>
                                   <div>In: {dayData.checkInTime ? new Date(dayData.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}</div>
                                   <div>Out: {dayData.checkOutTime ? new Date(dayData.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}</div>
                                   {otHours > 0 && <div className="text-amber-400 font-bold">Approved OT: {otHours} hrs</div>}
+                                  {status !== 'PRESENT' && <div className="text-[9px] text-amber-400/70 italic">⚠ Pending manager approval</div>}
                                 </>
                               ) : (
                                 <div className="text-[9px] text-slate-500">No attendance registered.</div>
@@ -556,18 +579,26 @@ export default function PayrollGenerationView() {
                     </div>
 
                     {/* Legend */}
-                    <div className="flex gap-4 text-[10px] text-slate-400 pt-2 justify-center border-t border-slate-800/40">
+                    <div className="flex flex-wrap gap-3 text-[10px] text-slate-400 pt-2 justify-center border-t border-slate-800/40">
                       <div className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-md bg-emerald-500/20 border border-emerald-500/40"></div>
-                        <span>Present (Standard Shift)</span>
+                        <span>P = Present</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-md bg-amber-500/20 border border-amber-500/40"></div>
-                        <span>Present (Overtime Worked)</span>
+                        <span>+h = Overtime</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-md bg-sky-500/20 border border-sky-500/40"></div>
+                        <span>CI = Checkin Done</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-md bg-indigo-500/20 border border-indigo-500/40"></div>
+                        <span>CO = Checkout Done</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-md bg-rose-500/20 border border-rose-500/40"></div>
-                        <span>Absent</span>
+                        <span>ABS = Absent</span>
                       </div>
                     </div>
                   </div>

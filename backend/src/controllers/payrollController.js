@@ -173,7 +173,7 @@ async function getGuardPayrollDetails(req, res) {
       [guard_id, startDateStr, endDateStr]
     );
 
-    const presentDays = attRes.rows.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
+    const presentDays = attRes.rows.filter(a => a.status === 'APPROVED').length;
     const absentDays = daysInMonth - presentDays;
     const approvedOtHours = otRes.rows.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
 
@@ -193,13 +193,34 @@ async function getGuardPayrollDetails(req, res) {
       const dayNum = index + 1;
       const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
       const att = attRes.rows.find(a => a.date.split('T')[0] === dateStr);
-      const isPresent = att && ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(att.status);
+      
+      let dayStatus = 'ABSENT';
+      let dayLabel = 'Absent';
+      if (att) {
+        if (att.status === 'APPROVED') {
+          dayStatus = 'PRESENT';
+          dayLabel = 'Present';
+        } else if (att.status === 'CHECKED_IN') {
+          dayStatus = 'CHECKED_IN';
+          dayLabel = 'Checkin Done';
+        } else if (att.status === 'CHECKED_OUT') {
+          dayStatus = 'CHECKED_OUT';
+          dayLabel = 'Checkout Done';
+        } else if (att.status === 'PENDING_REVIEW') {
+          dayStatus = 'PENDING';
+          dayLabel = 'Pending Review';
+        } else if (att.status === 'REJECTED') {
+          dayStatus = 'REJECTED';
+          dayLabel = 'Rejected';
+        }
+      }
+      
       return {
-        status: isPresent ? 'PRESENT' : 'ABSENT',
+        status: dayStatus,
         otHours: otRes.rows.find(ot => ot.date.split('T')[0] === dateStr && ot.status === 'APPROVED')?.overtime_hours || 0,
         checkInTime: att ? att.check_in_time : null,
         checkOutTime: att ? att.check_out_time : null,
-        label: isPresent ? 'Present' : 'Absent'
+        label: dayLabel
       };
     });
 
@@ -450,7 +471,7 @@ async function calculateMonthlyPayroll(req, res) {
       );
       const totalAdvances = parseFloat(advRes.rows[0].total_advances);
 
-      const presentDays = attRes.rows.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
+      const presentDays = attRes.rows.filter(a => a.status === 'APPROVED').length;
       const absentDays = daysInMonth - presentDays;
       const totalOtHours = otRes.rows.reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
 

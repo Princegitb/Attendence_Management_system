@@ -177,8 +177,8 @@ async function getOfficerGuardsChecklist(req, res) {
         date: today,
         totalGuards: guardsList.length,
         pendingCount: guardsList.filter(g => g.attendance.status === 'PENDING').length,
-        checkedInCount: guardsList.filter(g => ['APPROVED', 'PENDING_REVIEW', 'CHECKED_IN'].includes(g.attendance.status)).length,
-        checkedOutCount: guardsList.filter(g => g.attendance.status === 'CHECKED_OUT').length,
+        checkedInCount: guardsList.filter(g => ['CHECKED_IN', 'PENDING_REVIEW'].includes(g.attendance.status)).length,
+        checkedOutCount: guardsList.filter(g => ['CHECKED_OUT', 'APPROVED'].includes(g.attendance.status)).length,
         guards: guardsList
       }
     });
@@ -262,9 +262,12 @@ async function markCheckIn(req, res) {
       });
     }
 
-    // 5. Shift & Grace Period Verification (Auto-Approve if within Grace Period, else PENDING_REVIEW for Manager)
-    let initialStatus = 'APPROVED';
-    let statusMessage = `Check-in recorded and automatically approved for ${guard.name} (On Time / Grace Period).`;
+    // 5. Shift & Grace Period Verification
+    // Check-in always starts as CHECKED_IN. Manager approves only after checkout.
+    // Late check-ins (beyond grace period) go to PENDING_REVIEW for manager attention.
+    let initialStatus = 'CHECKED_IN';
+    let statusMessage = `Check-in recorded for ${guard.name}. Awaiting checkout and Manager approval.`;
+    let isLateCheckIn = false;
 
     if (guard.start_time) {
       const { totalMinutes: currentTotalMinutes } = getLocalTimeDetails(serverTimestamp);
@@ -274,6 +277,7 @@ async function markCheckIn(req, res) {
 
       if (currentTotalMinutes > (shiftTotalMinutes + graceMinutes)) {
         initialStatus = 'PENDING_REVIEW';
+        isLateCheckIn = true;
         statusMessage = `Check-in submitted for ${guard.name} (Late check-in). Kept for Manager review.`;
       }
     }
@@ -416,11 +420,11 @@ async function markCheckOut(req, res) {
     // 5. Upload photo
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
-    // 6. Preserve PENDING_REVIEW or REJECTED status if present, otherwise set CHECKED_OUT
+    // 6. Always set CHECKED_OUT on checkout so manager can review the complete attendance.
+    // Even late check-ins (PENDING_REVIEW) transition to CHECKED_OUT.
+    // Only REJECTED records are preserved — manager already decided on those.
     const currentStatus = existingAtt.rows[0].status;
-    const newStatus = (currentStatus === 'PENDING_REVIEW' || currentStatus === 'REJECTED')
-      ? currentStatus
-      : 'CHECKED_OUT';
+    const newStatus = (currentStatus === 'REJECTED') ? 'REJECTED' : 'CHECKED_OUT';
 
     const updateRes = await db.query(
       `UPDATE attendance
