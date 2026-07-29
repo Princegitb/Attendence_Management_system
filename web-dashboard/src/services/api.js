@@ -251,5 +251,14 @@ export const api = {
     body: JSON.stringify({ month, year, employee_salaries: salaries, overwrite })
   }),
   getPayrollHistory: () => request('/payroll/history'),
-  getPayrollDetails: (id) => request(`/payroll/details/${id}`)
+  getPayrollDetails: (id) => request(`/payroll/details/${id}`),
+
+  // Smart Roster
+  getFulfillmentStatus: () => request('/roster/fulfillment'),
+  getRosterSuggestions: () => request('/roster/suggestions'),
+  applyRosterSuggestions: (assignments) => request('/roster/apply-suggestions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignments })
+  })
 };

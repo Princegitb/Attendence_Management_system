@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS posts (
     latitude NUMERIC(10, 7) NOT NULL,
     longitude NUMERIC(10, 7) NOT NULL,
     allowed_radius_metres INT DEFAULT 100,
+    required_guards INT NOT NULL DEFAULT 1,
     status VARCHAR(20) DEFAULT 'ACTIVE',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

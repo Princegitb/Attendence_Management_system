@@ -88,7 +88,7 @@ export default function PayrollGenerationView() {
       } else {
         if (res.code === 'ALREADY_EXISTS') {
           if (window.confirm('Payroll for this month has already been finalized. Do you want to overwrite it and generate a new one?')) {
-            handleGenerateSubmit(true);
+            await handleGenerateSubmit(true);
           }
         } else {
           alert(res.message || 'Generation failed');

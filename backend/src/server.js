@@ -20,6 +20,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const payrollRoutes = require('./routes/payrollRoutes');
+const rosterRoutes = require('./routes/rosterRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -48,6 +49,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/roster', rosterRoutes);
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
