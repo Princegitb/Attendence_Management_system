@@ -245,10 +245,10 @@ export const api = {
   deleteAdvance: (id) => request(`/payroll/advances/${id}`, { method: 'DELETE' }),
   calculatePayroll: (month, year) => request(`/payroll/calculate?month=${month}&year=${year}`),
   getGuardPayrollDetail: (guardId, month, year) => request(`/payroll/guard-detail?guard_id=${guardId}&month=${month}&year=${year}`),
-  generatePayroll: (month, year, salaries) => request('/payroll/generate', {
+  generatePayroll: (month, year, salaries, overwrite = false) => request('/payroll/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ month, year, employee_salaries: salaries })
+    body: JSON.stringify({ month, year, employee_salaries: salaries, overwrite })
   }),
   getPayrollHistory: () => request('/payroll/history'),
   getPayrollDetails: (id) => request(`/payroll/details/${id}`)

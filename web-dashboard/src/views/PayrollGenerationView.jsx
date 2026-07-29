@@ -67,26 +67,32 @@ export default function PayrollGenerationView() {
     }
   };
 
-  const handleGenerateSubmit = async () => {
+  const handleGenerateSubmit = async (overwrite = false) => {
     if (salaries.length === 0) {
       alert('Calculate a preview first before generating payroll.');
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to lock and finalize payroll for ${monthsList.find(m => m.value === month)?.label} ${year}?`)) {
+    if (!overwrite && !window.confirm(`Are you sure you want to lock and finalize payroll for ${monthsList.find(m => m.value === month)?.label} ${year}?`)) {
       return;
     }
 
     setGenerating(true);
     try {
-      const res = await api.generatePayroll(month, year, salaries);
+      const res = await api.generatePayroll(month, year, salaries, overwrite);
       if (res.success) {
         alert('Payroll finalized and locked successfully!');
         setSalaries([]);
         loadHistory();
         setActiveSubTab('history');
       } else {
-        alert(res.message || 'Generation failed');
+        if (res.code === 'ALREADY_EXISTS') {
+          if (window.confirm('Payroll for this month has already been finalized. Do you want to overwrite it and generate a new one?')) {
+            handleGenerateSubmit(true);
+          }
+        } else {
+          alert(res.message || 'Generation failed');
+        }
       }
     } catch (err) {
       alert(err.message || 'Error generating payroll');

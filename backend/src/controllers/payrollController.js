@@ -595,7 +595,7 @@ async function calculateMonthlyPayroll(req, res) {
 async function generatePayroll(req, res) {
   const client = await db.getClient();
   try {
-    const { month, year, employee_salaries } = req.body;
+    const { month, year, employee_salaries, overwrite } = req.body;
 
     if (!month || !year || !employee_salaries || !Array.isArray(employee_salaries)) {
       return res.status(400).json({ success: false, message: 'Month, Year, and salary list are required.' });
@@ -611,8 +611,17 @@ async function generatePayroll(req, res) {
     );
 
     if (checkRes.rows.length > 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ success: false, message: 'Payroll for this month/year has already been generated.' });
+      if (overwrite) {
+        // Delete the existing payroll (cascade deletes payroll_details)
+        await client.query(`DELETE FROM payrolls WHERE id = $1`, [checkRes.rows[0].id]);
+      } else {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          success: false, 
+          code: 'ALREADY_EXISTS',
+          message: 'Payroll for this month/year has already been generated.' 
+        });
+      }
     }
 
     // 1. Calculate Summary aggregates
