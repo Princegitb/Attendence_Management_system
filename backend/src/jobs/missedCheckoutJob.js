@@ -44,47 +44,38 @@ function parseTimeOfDayToMinutes(timeStr) {
  */
 function computeCutoffDate(shiftDate, shiftEndTimeStr, now) {
   const endMin = parseTimeOfDayToMinutes(shiftEndTimeStr);
-  if (endMin === null) return null;
+  if (endMin === null || !shiftDate) return null;
 
-  // shiftDate is a "YYYY-MM-DD" string. We construct an ISO timestamp for shift end
-  // in the configured timezone by computing the offset manually.
-  //
-  // Approach: shift end occurs at endMin minutes after midnight local time on shiftDate.
-  // We find the UTC offset for that local wall-clock time using Intl.DateTimeFormat,
-  // then subtract it from now to derive the UTC instant.
-
-  const localDate = new Date(`${shiftDate}T00:00:00`);
-
-  // Compute the local-time-as-UTC milliseconds for the shift end instant.
-  // We use a trick: format a known UTC instant as local time, then compare.
-  // Simpler approach: try wall-clock times with the resolved Asia/Kolkata offset.
-  // For robustness across DST-free zones (India has no DST), we use the constant offset.
-
-  // India is UTC+5:30; for other zones we'd need a proper library. Since this app
-  // targets Asia/Kolkata per the existing controllers, we hard-code it here too.
-  // If the offset ever needs to differ, swap in a tz library later.
+  // Compute timezone offset in minutes for configured TIMEZONE dynamically via Intl
   const offsetMinutes = (() => {
-    if (TIMEZONE === 'Asia/Kolkata') return 330; // +05:30
-    // Fallback: derive offset for the timezone using Intl.
-    const dtf = new Intl.DateTimeFormat('en-US', {
-      timeZone: TIMEZONE,
-      timeZoneName: 'shortOffset'
-    });
-    const parts = dtf.formatToParts(now);
-    const offsetPart = parts.find(p => p.type === 'timeZoneName');
-    if (!offsetPart) return 0;
-    const m = offsetPart.value.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!m) return 0;
-    const sign = m[1] === '+' ? 1 : -1;
-    return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3] || '0', 10));
+    try {
+      const dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone: TIMEZONE,
+        timeZoneName: 'shortOffset'
+      });
+      const parts = dtf.formatToParts(now);
+      const offsetPart = parts.find(p => p.type === 'timeZoneName');
+      if (!offsetPart) return 330; // fallback +05:30
+      const m = offsetPart.value.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+      if (!m) return 330;
+      const sign = m[1] === '+' ? 1 : -1;
+      return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3] || '0', 10));
+    } catch (e) {
+      return 330; // fallback +05:30
+    }
   })();
 
-  const shiftEndUtcMs = Date.UTC(
-    localDate.getUTCFullYear(),
-    localDate.getUTCMonth(),
-    localDate.getUTCDate(),
-    0, 0, 0
-  ) + endMin * 60 * 1000 - offsetMinutes * 60 * 1000;
+  // Format YYYY-MM-DD components into UTC epoch
+  const dateParts = shiftDate.split('-').map(Number);
+  if (dateParts.length < 3 || dateParts.some(isNaN)) return null;
+
+  const year = dateParts[0];
+  const month = dateParts[1] - 1; // 0-indexed
+  const day = dateParts[2];
+
+  // Midnight UTC of shiftDate - offsetMinutes + endMin + buffer
+  const shiftMidnightUtcMs = Date.UTC(year, month, day, 0, 0, 0);
+  const shiftEndUtcMs = shiftMidnightUtcMs + (endMin - offsetMinutes) * 60 * 1000;
 
   return new Date(shiftEndUtcMs + MAX_CHECKOUT_BUFFER_MIN * 60 * 1000);
 }

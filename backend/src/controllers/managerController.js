@@ -15,16 +15,47 @@ const getLocalDateString = (dateObj = new Date()) => {
 // ==========================================
 async function getGuards(req, res) {
   try {
-    const result = await db.query(
-      `SELECT g.id, g.name, g.mobile, g.date_of_joining, g.status,
-              p.id AS post_id, p.name AS post_name,
-              s.id AS shift_id, s.name AS shift_name
-       FROM guards g
-       LEFT JOIN posts p ON g.assigned_post_id = p.id
-       LEFT JOIN shifts s ON g.assigned_shift_id = s.id
-       ORDER BY g.id DESC`
-    );
-    return res.json({ success: true, data: result.rows });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 100;
+    const offset = (page - 1) * limit;
+    const search = req.query.search ? `%${req.query.search.trim()}%` : null;
+
+    let queryStr = `
+      SELECT g.id, g.name, g.mobile, g.date_of_joining, g.status,
+             p.id AS post_id, p.name AS post_name,
+             s.id AS shift_id, s.name AS shift_name,
+             COUNT(*) OVER() AS total_count
+      FROM guards g
+      LEFT JOIN posts p ON g.assigned_post_id = p.id
+      LEFT JOIN shifts s ON g.assigned_shift_id = s.id
+    `;
+    const params = [];
+
+    if (search) {
+      params.push(search);
+      queryStr += ` WHERE g.name ILIKE $1 OR g.mobile ILIKE $1 OR p.name ILIKE $1`;
+    }
+
+    params.push(limit, offset);
+    queryStr += ` ORDER BY g.id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
+
+    const result = await db.query(queryStr, params);
+    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
+    const data = result.rows.map(r => {
+      const { total_count, ...guard } = r;
+      return guard;
+    });
+
+    return res.json({
+      success: true,
+      data,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit) || 1
+      }
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -668,12 +699,56 @@ async function exportAttendanceReport(req, res) {
 // ==========================================
 async function getAuditLogs(req, res) {
   try {
-    const result = await db.query(
-      `SELECT * FROM audit_logs 
-       ORDER BY timestamp DESC 
-       LIMIT 100`
-    );
-    return res.json({ success: true, data: result.rows });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const offset = (page - 1) * limit;
+    const { from_date, to_date, action } = req.query;
+
+    let queryStr = `
+      SELECT id, action, performed_by, performed_by_role, target_type, target_id, old_value, new_value, reason, timestamp,
+             COUNT(*) OVER() AS total_count
+      FROM audit_logs
+    `;
+    const params = [];
+    const whereClauses = [];
+
+    if (from_date) {
+      params.push(from_date);
+      whereClauses.push(`timestamp >= $${params.length}::TIMESTAMP`);
+    }
+    if (to_date) {
+      params.push(`${to_date} 23:59:59`);
+      whereClauses.push(`timestamp <= $${params.length}::TIMESTAMP`);
+    }
+    if (action) {
+      params.push(action);
+      whereClauses.push(`action = $${params.length}`);
+    }
+
+    if (whereClauses.length > 0) {
+      queryStr += ` WHERE ` + whereClauses.join(' AND ');
+    }
+
+    params.push(limit, offset);
+    queryStr += ` ORDER BY timestamp DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
+
+    const result = await db.query(queryStr, params);
+    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
+    const data = result.rows.map(r => {
+      const { total_count, ...log } = r;
+      return log;
+    });
+
+    return res.json({
+      success: true,
+      data,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit) || 1
+      }
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

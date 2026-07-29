@@ -327,30 +327,42 @@ async function markCheckIn(req, res) {
     const uploadResult = await uploadPhoto(photoFile.buffer, photoFile.originalname);
 
     // 7. Create attendance record with initial status (CHECKED_IN auto-approved or PENDING_REVIEW)
-    const insertRes = await db.query(
-      `INSERT INTO attendance (
-        guard_id, marked_by_officer_id, date, check_in_time,
-        check_in_latitude, check_in_longitude, check_in_gps_accuracy,
-        check_in_distance_from_post, check_in_photo_url,
-        post_id_snapshot, radius_snapshot, status, late_by_minutes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING id, check_in_time, status, late_by_minutes`,
-      [
-        guard.id,
-        officerId,
-        today,
-        serverTimestamp,
-        latitude,
-        longitude,
-        gps_accuracy || 0,
-        distanceMeters,
-        uploadResult.url,
-        guard.post_id,
-        allowedRadius,
-        initialStatus,
-        lateByMinutes
-      ]
-    );
+    let insertRes;
+    try {
+      insertRes = await db.query(
+        `INSERT INTO attendance (
+          guard_id, marked_by_officer_id, date, check_in_time,
+          check_in_latitude, check_in_longitude, check_in_gps_accuracy,
+          check_in_distance_from_post, check_in_photo_url,
+          post_id_snapshot, radius_snapshot, status, late_by_minutes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING id, check_in_time, status, late_by_minutes`,
+        [
+          guard.id,
+          officerId,
+          today,
+          serverTimestamp,
+          latitude,
+          longitude,
+          gps_accuracy || 0,
+          distanceMeters,
+          uploadResult.url,
+          guard.post_id,
+          allowedRadius,
+          initialStatus,
+          lateByMinutes
+        ]
+      );
+    } catch (dbErr) {
+      // Catch unique constraint race condition (duplicate key error)
+      if (dbErr.code === '23505' || dbErr.message.includes('unique') || dbErr.message.includes('duplicate')) {
+        return res.status(409).json({
+          success: false,
+          message: 'Check-in has already been marked for this guard today.'
+        });
+      }
+      throw dbErr;
+    }
 
     await logAuditEvent({
       action: 'GUARD_CHECK_IN',
