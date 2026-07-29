@@ -12,10 +12,9 @@ export default function PostsView() {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    latitude: 28.6139,
-    longitude: 77.2090,
+    latitude: 28.613939,
+    longitude: 77.209021,
     allowed_radius_metres: 100,
-    required_guards: 1,
     status: 'ACTIVE'
   });
 
@@ -59,7 +58,6 @@ export default function PostsView() {
       latitude: 28.613939,
       longitude: 77.209021,
       allowed_radius_metres: 100,
-      required_guards: 1,
       status: 'ACTIVE'
     });
     setError('');
@@ -73,8 +71,7 @@ export default function PostsView() {
       address: post.address,
       latitude: parseFloat(post.latitude),
       longitude: parseFloat(post.longitude),
-      allowed_radius_metres: parseInt(post.allowed_radius_metres || 100, 10),
-      required_guards: post.required_guards !== undefined ? parseInt(post.required_guards, 10) : 1,
+      allowed_radius_metres: parseInt(post.allowed_radius_metres || 100),
       status: post.status
     });
     setError('');
@@ -181,10 +178,6 @@ export default function PostsView() {
                   <span>Geo-fence Radius:</span>
                   <span>{post.allowed_radius_metres} meters</span>
                 </div>
-                <div className="flex justify-between font-mono text-purple-400 font-semibold border-t border-slate-800 pt-1">
-                  <span>Required Guards:</span>
-                  <span>{post.required_guards || 1} guards</span>
-                </div>
               </div>
             </div>
           ))
@@ -226,29 +219,15 @@ export default function PostsView() {
                  </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Address / Location Description</label>
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="e.g. Central Business District, Gate A"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-
-                <div>
-                   <label className="block text-xs font-semibold text-slate-300 mb-1">Required Guards</label>
-                   <input
-                     type="number"
-                     min="1"
-                     value={formData.required_guards}
-                     onChange={(e) => setFormData({ ...formData, required_guards: e.target.value === '' ? '' : parseInt(e.target.value) })}
-                     placeholder="e.g. 3"
-                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                   />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Address / Location Description</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="e.g. Central Business District, Gate A"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                />
               </div>
 
               {/* Card-Free Location & Coordinates Picker */}

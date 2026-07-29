@@ -10,8 +10,7 @@ import {
   FileSpreadsheet,
   History,
   DollarSign,
-  Award,
-  Wand2
+  Award
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
@@ -21,7 +20,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'guards', label: 'Guard Roster & Bulk Import', icon: Users },
     { id: 'officers', label: 'Field Officers', icon: UserSquare2 },
     { id: 'posts', label: 'Posts & Leaflet Map', icon: MapPin },
-    { id: 'smart-roster', label: 'Smart Roster', icon: Wand2 },
     { id: 'assignments', label: 'Officer Assignments', icon: UserCheck },
     { id: 'shifts', label: 'Shift Setup', icon: Clock },
     { id: 'reports', label: 'Reports Export', icon: FileSpreadsheet },

@@ -13,7 +13,6 @@ import ReportsView from './views/ReportsView';
 import AuditLogsView from './views/AuditLogsView';
 import PayrollConfigView from './views/PayrollConfigView';
 import PayrollGenerationView from './views/PayrollGenerationView';
-import SmartRosterView from './views/SmartRosterView';
 import { getCurrentUser, logout, api } from './services/api';
 
 export default function App() {
@@ -70,7 +69,6 @@ export default function App() {
           {activeTab === 'audit-logs' && <AuditLogsView />}
           {activeTab === 'payroll-config' && <PayrollConfigView />}
           {activeTab === 'payroll-run' && <PayrollGenerationView />}
-          {activeTab === 'smart-roster' && <SmartRosterView />}
         </main>
       </div>
     </div>
