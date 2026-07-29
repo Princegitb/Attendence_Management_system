@@ -64,6 +64,7 @@ export default function LocationPickerMap({
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     performSearch(query);
   };
 
@@ -126,24 +127,36 @@ export default function LocationPickerMap({
       </div>
 
       {/* Instant Live Search Bar */}
-      <form onSubmit={handleFormSubmit} className="relative">
+      <div className="relative">
         <input
           type="text"
           value={query}
           onChange={handleInputChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              performSearch(query);
+            }
+          }}
           placeholder="Search landmark or city (e.g. Cyber City, Noida, Mumbai)..."
           className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-24 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
         />
         <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
 
         <button
-          type="submit"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            performSearch(query);
+          }}
           disabled={searching}
           className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-sky-500 hover:bg-sky-400 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
         >
           {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Search'}
         </button>
-      </form>
+      </div>
 
       {/* Live Search Results Dropdown */}
       {searchResults.length > 0 && (
