@@ -106,7 +106,7 @@ export default function OfficersView() {
 
       {/* Officers Table */}
       <div className="bg-slate-800/50 border border-slate-700/60 rounded-3xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
               <tr>

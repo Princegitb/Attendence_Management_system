@@ -118,7 +118,7 @@ export default function OverviewView({ onNavigate }) {
           <span className="text-xs text-slate-400 font-mono">Date: {getLocalDateString()}</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
               <tr>
