@@ -604,17 +604,13 @@ async function generatePayroll(req, res) {
     // Start database transaction
     await client.query('BEGIN');
 
-    // Check if payroll already generated for this month
-    const checkRes = await client.query(
-      `SELECT id FROM payrolls WHERE month = $1 AND year = $2`,
-      [month, year]
-    );
-
-    if (checkRes.rows.length > 0) {
-      if (overwrite) {
-        // Delete the existing payroll (cascade deletes payroll_details)
-        await client.query(`DELETE FROM payrolls WHERE id = $1`, [checkRes.rows[0].id]);
-      } else {
+    if (!overwrite) {
+      // Check if payroll already generated for this month
+      const checkRes = await client.query(
+        `SELECT id FROM payrolls WHERE month = $1 AND year = $2`,
+        [month, year]
+      );
+      if (checkRes.rows.length > 0) {
         await client.query('ROLLBACK');
         return res.status(400).json({ 
           success: false, 
@@ -622,6 +618,11 @@ async function generatePayroll(req, res) {
           message: 'Payroll for this month/year has already been generated.' 
         });
       }
+    } else {
+      // If overwrite is true, directly delete the existing payroll for this month/year
+      // This is atomic and avoids race conditions where a select followed by a delete 
+      // operates on stale row IDs.
+      await client.query(`DELETE FROM payrolls WHERE month = $1 AND year = $2`, [month, year]);
     }
 
     // 1. Calculate Summary aggregates
