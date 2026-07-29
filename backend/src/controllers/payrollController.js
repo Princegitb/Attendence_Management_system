@@ -70,7 +70,8 @@ async function updateConfiguration(req, res) {
   }
 }
 
-async function bulkUpdateConfigurations(req, res) {
+async function bulkUpdatePayrollConfig(req, res) {
+  const client = await db.getClient();
   try {
     const { salary_type, basic_salary, ot_rate_per_hour, is_ot_eligible } = req.body;
 
@@ -78,32 +79,38 @@ async function bulkUpdateConfigurations(req, res) {
       return res.status(400).json({ success: false, message: 'Salary Type is required.' });
     }
 
+    // Start database transaction
+    await client.query('BEGIN');
+
     // 1. Get all active guards
-    const guardsRes = await db.query(`SELECT id FROM guards WHERE status = 'ACTIVE'`);
+    const guardsRes = await client.query(`SELECT id FROM guards WHERE status = 'ACTIVE'`);
     const guardIds = guardsRes.rows.map(g => g.id);
 
     if (guardIds.length === 0) {
+      await client.query('COMMIT');
       return res.json({ success: true, message: 'No active guards found to configure.' });
     }
 
     // 2. Perform bulk insertion/updating (handling compatibility for PostgreSQL and mock)
     for (const guardId of guardIds) {
-      const checkRes = await db.query(`SELECT id FROM salary_configurations WHERE guard_id = $1`, [guardId]);
+      const checkRes = await client.query(`SELECT id FROM salary_configurations WHERE guard_id = $1`, [guardId]);
       if (checkRes.rows.length > 0) {
-        await db.query(
+        await client.query(
           `UPDATE salary_configurations
            SET salary_type = $2, basic_salary = $3, ot_rate_per_hour = $4, is_ot_eligible = $5, updated_at = CURRENT_TIMESTAMP
            WHERE guard_id = $1`,
           [guardId, salary_type, basic_salary || 0.00, ot_rate_per_hour || 0.00, is_ot_eligible || false]
         );
       } else {
-        await db.query(
+        await client.query(
           `INSERT INTO salary_configurations (guard_id, salary_type, basic_salary, ot_rate_per_hour, is_ot_eligible)
            VALUES ($1, $2, $3, $4, $5)`,
           [guardId, salary_type, basic_salary || 0.00, ot_rate_per_hour || 0.00, is_ot_eligible || false]
         );
       }
     }
+
+    await client.query('COMMIT');
 
     await logAuditEvent({
       action: 'BULK_UPDATE_SALARY_CONFIG',
@@ -114,7 +121,10 @@ async function bulkUpdateConfigurations(req, res) {
 
     return res.json({ success: true, message: `Successfully updated configurations for all ${guardIds.length} active guards.` });
   } catch (err) {
+    await client.query('ROLLBACK');
     return res.status(500).json({ success: false, message: err.message });
+  } finally {
+    client.release();
   }
 }
 
@@ -173,7 +183,7 @@ async function getGuardPayrollDetails(req, res) {
       [guard_id, startDateStr, endDateStr]
     );
 
-    const presentDays = attRes.rows.filter(a => a.status === 'APPROVED').length;
+    const presentDays = attRes.rows.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
     const absentDays = daysInMonth - presentDays;
     const approvedOtHours = otRes.rows.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
 
@@ -496,7 +506,7 @@ async function calculateMonthlyPayroll(req, res) {
 
     for (const guard of guardsRes.rows) {
       const guardAtt = attendanceMap[guard.id] || [];
-      const presentDays = guardAtt.filter(a => a.status === 'APPROVED').length;
+      const presentDays = guardAtt.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
       const absentDays = daysInMonth - presentDays;
       const totalOtHours = overtimeMap[guard.id] || 0;
       const totalAdvances = advancesMap[guard.id] || 0;
@@ -549,86 +559,84 @@ async function generatePayroll(req, res) {
     }
 
     // Start database transaction
-    if (client.query && typeof client.query === 'function') {
-      await client.query('BEGIN');
+    await client.query('BEGIN');
 
-      // Check if payroll already generated for this month
-      const checkRes = await client.query(
-        `SELECT id FROM payrolls WHERE month = $1 AND year = $2`,
-        [month, year]
-      );
+    // Check if payroll already generated for this month
+    const checkRes = await client.query(
+      `SELECT id FROM payrolls WHERE month = $1 AND year = $2`,
+      [month, year]
+    );
 
-      if (checkRes.rows.length > 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ success: false, message: 'Payroll for this month/year has already been generated.' });
-      }
-
-      // 1. Calculate Summary aggregates
-      let totalBasic = 0;
-      let totalOt = 0;
-      let totalAdvances = 0;
-      let totalNet = 0;
-
-      employee_salaries.forEach(emp => {
-        totalBasic += parseFloat(emp.basicEarnings || 0);
-        totalOt += parseFloat(emp.otEarnings || 0);
-        totalAdvances += parseFloat(emp.advanceDeduction || 0);
-        totalNet += parseFloat(emp.netSalary || 0);
-      });
-
-      // 2. Insert Payroll Master row
-      const payrollRes = await client.query(
-        `INSERT INTO payrolls (
-          month, year, status, total_basic_earnings, 
-          total_ot_earnings, total_advance_deductions, total_net_salary, generated_by
-        ) VALUES ($1, $2, 'APPROVED', $3, $4, $5, $6, $7)
-        RETURNING id`,
-        [month, year, totalBasic, totalOt, totalAdvances, totalNet, req.user.id]
-      );
-
-      const payrollId = payrollRes.rows[0].id;
-
-      // 3. Insert Payroll Details row per guard
-      for (const emp of employee_salaries) {
-        await client.query(
-          `INSERT INTO payroll_details (
-            payroll_id, guard_id, present_days, absent_days, half_days,
-            overtime_hours, basic_earnings, ot_earnings, advance_deduction, other_deductions, net_salary
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [
-            payrollId,
-            emp.guardId,
-            emp.presentDays,
-            emp.absentDays,
-            0, // half_days default
-            emp.overtimeHours,
-            emp.basicEarnings,
-            emp.otEarnings,
-            emp.advanceDeduction,
-            emp.otherDeductions || 0.00,
-            emp.netSalary
-          ]
-        );
-      }
-
-      await client.query('COMMIT');
-
-      await logAuditEvent({
-        action: 'GENERATE_PAYROLL',
-        performedBy: req.user.name,
-        performedByRole: req.user.role,
-        targetType: 'Payroll',
-        targetId: payrollId,
-        reason: `Generated and locked payroll for ${month}/${year}`
-      });
-
-      return res.status(201).json({ success: true, message: 'Payroll generated and locked successfully.', payrollId });
+    if (checkRes.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Payroll for this month/year has already been generated.' });
     }
+
+    // 1. Calculate Summary aggregates
+    let totalBasic = 0;
+    let totalOt = 0;
+    let totalAdvances = 0;
+    let totalNet = 0;
+
+    employee_salaries.forEach(emp => {
+      totalBasic += parseFloat(emp.basicEarnings || 0);
+      totalOt += parseFloat(emp.otEarnings || 0);
+      totalAdvances += parseFloat(emp.advanceDeduction || 0);
+      totalNet += parseFloat(emp.netSalary || 0);
+    });
+
+    // 2. Insert Payroll Master row
+    const payrollRes = await client.query(
+      `INSERT INTO payrolls (
+        month, year, status, total_basic_earnings, 
+        total_ot_earnings, total_advance_deductions, total_net_salary, generated_by
+      ) VALUES ($1, $2, 'APPROVED', $3, $4, $5, $6, $7)
+      RETURNING id`,
+      [month, year, totalBasic, totalOt, totalAdvances, totalNet, req.user.id]
+    );
+
+    const payrollId = payrollRes.rows[0].id;
+
+    // 3. Insert Payroll Details row per guard
+    for (const emp of employee_salaries) {
+      await client.query(
+        `INSERT INTO payroll_details (
+          payroll_id, guard_id, present_days, absent_days, half_days,
+          overtime_hours, basic_earnings, ot_earnings, advance_deduction, other_deductions, net_salary
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          payrollId,
+          emp.guardId,
+          emp.presentDays,
+          emp.absentDays,
+          0, // half_days default
+          emp.overtimeHours,
+          emp.basicEarnings,
+          emp.otEarnings,
+          emp.advanceDeduction,
+          emp.otherDeductions || 0.00,
+          emp.netSalary
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    await logAuditEvent({
+      action: 'GENERATE_PAYROLL',
+      performedBy: req.user.name,
+      performedByRole: req.user.role,
+      targetType: 'Payroll',
+      targetId: payrollId,
+      reason: `Generated and locked payroll for ${month}/${year}`
+    });
+
+    return res.status(201).json({ success: true, message: 'Payroll generated and locked successfully.', payrollId });
   } catch (err) {
-    if (client.query) await client.query('ROLLBACK');
+    await client.query('ROLLBACK');
     return res.status(500).json({ success: false, message: err.message });
   } finally {
-    if (client.release) client.release();
+    client.release();
   }
 }
 

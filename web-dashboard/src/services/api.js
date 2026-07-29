@@ -1,8 +1,13 @@
 const API_BASE = '/api';
 
+let inMemoryAccessToken = null;
+
+export function setAccessToken(token) {
+  inMemoryAccessToken = token;
+}
+
 function getAuthHeader() {
-  const token = localStorage.getItem('guard_access_token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+  return inMemoryAccessToken ? { 'Authorization': `Bearer ${inMemoryAccessToken}` } : {};
 }
 
 export async function login(mobile, password) {
@@ -13,16 +18,24 @@ export async function login(mobile, password) {
   });
   const data = await res.json();
   if (data.success) {
-    localStorage.setItem('guard_access_token', data.data.accessToken);
-    localStorage.setItem('guard_refresh_token', data.data.refreshToken);
+    inMemoryAccessToken = data.data.accessToken;
     localStorage.setItem('guard_user', JSON.stringify(data.data.user));
   }
   return data;
 }
 
-export function logout() {
-  localStorage.removeItem('guard_access_token');
-  localStorage.removeItem('guard_refresh_token');
+export async function logout() {
+  try {
+    const headers = getAuthHeader();
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers,
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.error('Logout error:', err);
+  }
+  inMemoryAccessToken = null;
   localStorage.removeItem('guard_user');
 }
 
@@ -32,39 +45,35 @@ export function getCurrentUser() {
 }
 
 async function refreshToken() {
-  const refreshTok = localStorage.getItem('guard_refresh_token');
-  if (!refreshTok) return null;
-
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: refreshTok })
+      body: JSON.stringify({}),
+      credentials: 'include'
     });
     const data = await res.json();
     if (data.success && data.data?.accessToken) {
-      localStorage.setItem('guard_access_token', data.data.accessToken);
-      if (data.data.refreshToken) {
-        localStorage.setItem('guard_refresh_token', data.data.refreshToken);
-      }
+      inMemoryAccessToken = data.data.accessToken;
       return data.data.accessToken;
     }
   } catch (err) {
     console.error('Silent token refresh error:', err);
   }
+  inMemoryAccessToken = null;
   return null;
 }
 
 async function request(endpoint, options = {}, isRetry = false) {
-  const token = localStorage.getItem('guard_access_token');
   const headers = {
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...getAuthHeader(),
     ...(options.headers || {})
   };
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    headers
+    headers,
+    credentials: 'include'
   });
 
   const data = await res.json();
@@ -74,7 +83,7 @@ async function request(endpoint, options = {}, isRetry = false) {
     if (newToken) {
       return request(endpoint, options, true);
     } else {
-      logout();
+      await logout();
       window.location.reload();
       throw new Error('Your session expired. Please log in again.');
     }
@@ -86,12 +95,13 @@ async function request(endpoint, options = {}, isRetry = false) {
 export const api = {
   // Attendance
   getAttendance: (date, officerId, postId, status, shiftId) => {
-    let url = `/attendance?date=${date || ''}`;
-    if (officerId) url += `&officer_id=${officerId}`;
-    if (postId) url += `&post_id=${postId}`;
-    if (status) url += `&status=${status}`;
-    if (shiftId) url += `&shift_id=${shiftId}`;
-    return request(url);
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (officerId) params.append('officer_id', officerId);
+    if (postId) params.append('post_id', postId);
+    if (status) params.append('status', status);
+    if (shiftId) params.append('shift_id', shiftId);
+    return request(`/attendance?${params.toString()}`);
   },
   correctAttendance: (id, status, reason, scope) => request(`/attendance/${id}/correction`, {
     method: 'PUT',
@@ -177,9 +187,33 @@ export const api = {
 
   // Audit Logs & Reports
   getAuditLogs: () => request('/audit-logs'),
-  getReportExportUrl: (fromDate, toDate) => {
-    const token = localStorage.getItem('guard_access_token');
-    return `${API_BASE}/reports/export?from_date=${fromDate}&to_date=${toDate}&token=${token}`;
+  downloadReportCSV: async (fromDate, toDate) => {
+    const headers = {
+      ...getAuthHeader()
+    };
+    const res = await fetch(`${API_BASE}/reports/export?from_date=${fromDate}&to_date=${toDate}`, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    });
+    if (res.status === 401 || res.status === 403) {
+      const newToken = await refreshToken();
+      if (newToken) {
+        const retryRes = await fetch(`${API_BASE}/reports/export?from_date=${fromDate}&to_date=${toDate}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${newToken}`
+          },
+          credentials: 'include'
+        });
+        if (retryRes.ok) return await retryRes.blob();
+      }
+      throw new Error('Failed to export report: session expired or unauthorized.');
+    }
+    if (!res.ok) {
+      throw new Error('Failed to export report.');
+    }
+    return await res.blob();
   },
 
   // Payroll

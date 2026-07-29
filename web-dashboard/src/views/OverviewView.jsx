@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users, MapPin, UserSquare2, ClipboardCheck, ShieldCheck, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
+import { getLocalDateString } from '../utils/date';
 
 export default function OverviewView({ onNavigate }) {
   const [guards, setGuards] = useState([]);
@@ -16,7 +17,7 @@ export default function OverviewView({ onNavigate }) {
           api.getGuards(),
           api.getPosts(),
           api.getOfficers(),
-          api.getAttendance(new Date().toISOString().split('T')[0])
+          api.getAttendance(getLocalDateString())
         ]);
 
         if (gRes.success) setGuards(gRes.data || []);
@@ -32,7 +33,8 @@ export default function OverviewView({ onNavigate }) {
     loadStats();
   }, []);
 
-  const totalGuards = guards.length;
+  const activeGuardsList = guards.filter(g => g.status === 'ACTIVE');
+  const totalGuards = activeGuardsList.length;
   const activePosts = posts.length;
   const activeOfficers = officers.length;
   const todayCheckedIn = attendance.filter(a => a.check_in_time).length;
@@ -113,7 +115,7 @@ export default function OverviewView({ onNavigate }) {
             <h3 className="text-sm font-bold text-white">Today's Live Attendance Feed</h3>
             <p className="text-xs text-slate-400">Verified by Field Officer live photos & server Haversine formula</p>
           </div>
-          <span className="text-xs text-slate-400 font-mono">Date: {new Date().toISOString().split('T')[0]}</span>
+          <span className="text-xs text-slate-400 font-mono">Date: {getLocalDateString()}</span>
         </div>
 
         <div className="overflow-x-auto">

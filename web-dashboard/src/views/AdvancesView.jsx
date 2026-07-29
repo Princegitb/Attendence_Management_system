@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Landmark, Plus, Trash2, Edit3, Save, X, Calendar, AlertCircle } from 'lucide-react';
+import { Landmark, Plus, Trash2, Edit3, Save, X, Calendar, User, IndianRupee } from 'lucide-react';
 import { api } from '../services/api';
+import { getLocalDateString } from '../utils/date';
 
 export default function AdvancesView() {
   const [advances, setAdvances] = useState([]);
@@ -10,7 +11,7 @@ export default function AdvancesView() {
   // New advance form state
   const [selectedGuardId, setSelectedGuardId] = useState('');
   const [amount, setAmount] = useState('');
-  const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [advanceDate, setAdvanceDate] = useState(getLocalDateString());
   const [reason, setReason] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -72,7 +73,7 @@ export default function AdvancesView() {
   const startEdit = (row) => {
     setEditingId(row.id);
     setEditAmount(row.amount);
-    setEditDate(row.advance_date ? new Date(row.advance_date).toISOString().split('T')[0] : '');
+    setEditDate(row.advance_date ? getLocalDateString(new Date(row.advance_date)) : '');
     setEditReason(row.reason || '');
   };
 

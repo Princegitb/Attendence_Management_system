@@ -69,16 +69,25 @@ async function uploadPhoto(buffer, originalName = 'photo.jpg') {
     };
   }
 
-  // 3. Fallback to Base64 Database storage (for offline or local dev without credentials)
-  const base64Url = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+  // 3. Fallback to Local Disk storage (protects database from base64 bloat)
+  const fs = require('fs');
+  const path = require('path');
+  const uploadsDir = path.join(__dirname, '../../uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  const filePath = path.join(uploadsDir, filename);
+  fs.writeFileSync(filePath, buffer);
+
   return {
     key: filename,
-    url: base64Url
+    url: `/api/media/photo?key=${filename}`
   };
 }
 
 function getLocalPhotoPath(key) {
-  return null;
+  const path = require('path');
+  return path.join(__dirname, '../../uploads', key);
 }
 
 module.exports = {

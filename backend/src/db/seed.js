@@ -7,8 +7,11 @@ async function seedDb() {
 
   try {
     // Production Initial Super Admin Account Initialization
-    const adminMobile = process.env.ADMIN_MOBILE || '9876543210';
-    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'adminpassword';
+    const adminMobile = process.env.ADMIN_MOBILE;
+    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
+    if (!adminMobile || !adminPassword) {
+      throw new Error('ADMIN_MOBILE and ADMIN_INITIAL_PASSWORD must be configured in environment variables.');
+    }
     const mgrPasswordHash = await bcrypt.hash(adminPassword, 10);
 
     // Check if initial admin already exists

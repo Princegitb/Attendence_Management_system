@@ -138,8 +138,8 @@ export default function PayrollGenerationView() {
   }, [activeSubTab]);
 
   // Aggregate stats
-  const totalPayout = salaries.reduce((acc, row) => acc + parseFloat(row.netSalary), 0);
-  const totalOT = salaries.reduce((acc, row) => acc + parseFloat(row.otEarnings), 0);
+  const totalPayout = salaries.reduce((acc, row) => acc + parseFloat(row.netSalary || 0), 0);
+  const totalOT = salaries.reduce((acc, row) => acc + parseFloat(row.otEarnings || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -301,11 +301,11 @@ export default function PayrollGenerationView() {
                         <td className="p-4 font-mono text-slate-300">
                           {row.presentDays}d / {row.absentDays}a
                         </td>
-                        <td className="p-4 font-mono">₹{row.basicEarnings.toFixed(2)}</td>
-                        <td className="p-4 font-mono text-slate-400">{row.overtimeHours} hrs</td>
-                        <td className="p-4 font-mono text-sky-400">₹{row.otEarnings.toFixed(2)}</td>
+                        <td className="p-4 font-mono">₹{parseFloat(row.basicEarnings || 0).toFixed(2)}</td>
+                        <td className="p-4 font-mono text-slate-400">{row.overtimeHours || 0} hrs</td>
+                        <td className="p-4 font-mono text-sky-400">₹{parseFloat(row.otEarnings || 0).toFixed(2)}</td>
                         <td className="p-4 font-mono font-bold text-white text-right">
-                          ₹{row.netSalary.toFixed(2)}
+                          ₹{parseFloat(row.netSalary || 0).toFixed(2)}
                         </td>
                         <td className="p-4 text-right">
                           <button

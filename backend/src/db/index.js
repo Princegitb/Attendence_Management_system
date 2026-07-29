@@ -66,6 +66,10 @@ try {
     console.error('Unexpected error on idle PostgreSQL client:', err.message);
   });
 } catch (e) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: PostgreSQL client init failed in production:', e.message);
+    throw e;
+  }
   console.warn('PostgreSQL client init failed, switching to in-memory db fallback:', e.message);
   useInMemoryDb = true;
 }
@@ -86,6 +90,10 @@ async function query(text, params = []) {
                                  error.message.includes('ENOTFOUND') ||
                                  error.message.includes('timeout');
       if (isConnectionError) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error(`FATAL: PostgreSQL connection failed (${error.message}). Refusing to fallback to in-memory DB in production.`);
+          throw error;
+        }
         console.warn(`PostgreSQL connection failed (${error.message}). Operating in dev mode with mock DB fallback.`);
         useInMemoryDb = true;
         return simulateQuery(text, params);
@@ -93,6 +101,9 @@ async function query(text, params = []) {
       throw error;
     }
   } else {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL: Database connection is not available and in-memory fallback is disabled in production.');
+    }
     return simulateQuery(text, params);
   }
 }
@@ -256,7 +267,21 @@ function simulateQuery(text, params) {
           post_name: post ? post.name : null
         };
       });
-      if (lowerSql.includes('where officer_id = $1')) {
+      if (lowerSql.includes('where officer_id = $1') && (lowerSql.includes('guard_id = $2 or post_id = $3') || lowerSql.includes('guard_id = $2 or post_id = $2'))) {
+        const officer_id = params[0];
+        const guard_id = params[1];
+        const post_id = params[2] !== undefined ? params[2] : params[1];
+        const todayStr = new Date().toISOString().split('T')[0];
+        res = res.filter(oa => {
+          const matchOfficer = String(oa.officer_id) === String(officer_id);
+          const matchTarget = (oa.guard_id !== null && String(oa.guard_id) === String(guard_id)) || 
+                              (oa.post_id !== null && String(oa.post_id) === String(post_id));
+          let matchDates = true;
+          if (oa.from_date && oa.from_date > todayStr) matchDates = false;
+          if (oa.to_date && oa.to_date < todayStr) matchDates = false;
+          return matchOfficer && matchTarget && matchDates;
+        });
+      } else if (lowerSql.includes('where officer_id = $1')) {
         res = res.filter(a => String(a.officer_id) === String(params[0]));
       }
       return { rows: res, rowCount: res.length };
@@ -716,6 +741,10 @@ async function getClient() {
       const client = await pool.connect();
       return client;
     } catch (err) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error(`FATAL: PostgreSQL getClient failed in production: ${err.message}`);
+        throw err;
+      }
       console.warn(`PostgreSQL getClient failed (${err.message}). Operating in dev mode with mock DB fallback.`);
       useInMemoryDb = true;
       return {
@@ -723,6 +752,9 @@ async function getClient() {
         release: () => {}
       };
     }
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: Database connection is not available and in-memory fallback is disabled in production.');
   }
   return {
     query: simulateQuery,

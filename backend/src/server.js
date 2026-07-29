@@ -28,8 +28,11 @@ const PORT = process.env.PORT || 5000;
 app.set('trust proxy', 1);
 
 // Security & Parsing Middlewares
-app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors());
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

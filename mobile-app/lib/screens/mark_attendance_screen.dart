@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image/image.dart' as img;
 import '../models/guard.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -24,6 +25,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
 
   Position? _currentPosition;
   bool _isSubmitting = false;
+  bool _permissionPermanentlyDenied = false;
 
   String? _serverError;
   String? _successMsg;
@@ -67,6 +69,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   Future<void> _acquireLocation() async {
     setState(() {
       _serverError = null;
+      _permissionPermanentlyDenied = false;
     });
 
     try {
@@ -75,10 +78,27 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
         _currentPosition = pos;
       });
     } catch (e) {
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
       setState(() {
-        _serverError = e.toString();
+        if (errorMsg == 'LOCATION_PERMANENTLY_DENIED') {
+          _serverError = 'Location permissions are permanently denied. Please allow them in settings.';
+          _permissionPermanentlyDenied = true;
+        } else {
+          _serverError = errorMsg;
+        }
       });
     }
+  }
+
+  Future<Uint8List> _compressImage(File file) async {
+    final bytes = await file.readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return bytes;
+    img.Image resized = decoded;
+    if (decoded.width > 1024) {
+      resized = img.copyResize(decoded, width: 1024);
+    }
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 80));
   }
 
   Future<void> _takePhoto() async {
@@ -93,8 +113,12 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
           _webImageBytes = bytes;
         });
       } else {
+        final file = File(image.path);
+        final compressedBytes = await _compressImage(file);
+        await file.writeAsBytes(compressedBytes);
         setState(() {
-          _capturedImage = File(image.path);
+          _capturedImage = file;
+          _serverError = null;
         });
       }
     } catch (e) {
@@ -105,21 +129,39 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   }
 
   void _submitAttendance() async {
+    if (_isSubmitting) return;
+
     if (_capturedImage == null && _webImageBytes == null) {
       setState(() => _serverError = 'Please capture a live photo of the guard using the camera.');
       return;
-    }
-
-    if (_currentPosition == null) {
-      await _acquireLocation();
-      if (_currentPosition == null) return;
     }
 
     setState(() {
       _isSubmitting = true;
       _serverError = null;
       _successMsg = null;
+      _permissionPermanentlyDenied = false;
     });
+
+    // Fetch fresh GPS coordinates right before submission
+    try {
+      final pos = await LocationService.getCurrentLocation();
+      setState(() {
+        _currentPosition = pos;
+      });
+    } catch (e) {
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
+      setState(() {
+        if (errorMsg == 'LOCATION_PERMANENTLY_DENIED') {
+          _serverError = 'Location permissions are permanently denied. Please allow them in settings.';
+          _permissionPermanentlyDenied = true;
+        } else {
+          _serverError = 'Could not acquire fresh GPS: $errorMsg';
+        }
+        _isSubmitting = false;
+      });
+      return;
+    }
 
     try {
       final isCheckIn = widget.guard.checkInTime == null && widget.guard.attendanceStatus == 'PENDING';
@@ -247,16 +289,32 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.redAccent),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _serverError!,
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w500),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.redAccent),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _serverError!,
+                              style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (_permissionPermanentlyDenied) ...[
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: () => Geolocator.openAppSettings(),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.redAccent),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Open App Settings', style: TextStyle(color: Colors.white, fontSize: 11)),
+                        )
+                      ]
                     ],
                   ),
                 ),
@@ -326,6 +384,55 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              if (_currentPosition != null) ...[
+                Builder(
+                  builder: (context) {
+                    final dist = Geolocator.distanceBetween(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
+                      widget.guard.post.latitude,
+                      widget.guard.post.longitude,
+                    );
+                    final isWithin = dist <= widget.guard.post.allowedRadiusMetres;
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isWithin
+                            ? const Color(0xFF064E3B).withValues(alpha: 0.15)
+                            : const Color(0xFF7F1D1D).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isWithin ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isWithin ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+                            color: isWithin ? emeraldAccent : Colors.redAccent,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isWithin
+                                  ? 'Within Range: You are ${dist.toStringAsFixed(1)}m from post.'
+                                  : 'OUT OF RANGE: You are ${dist.toStringAsFixed(1)}m from post (Max: ${widget.guard.post.allowedRadiusMetres}m).',
+                              style: TextStyle(
+                                color: isWithin ? emeraldAccent : Colors.redAccent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Camera Viewport / Preview Box
               const Text(

@@ -1,15 +1,31 @@
 import React, { useState } from 'react';
 import { FileSpreadsheet, Download, Calendar, Filter } from 'lucide-react';
 import { api } from '../services/api';
+import { getLocalDateString } from '../utils/date';
 
 export default function ReportsView() {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const [fromDate, setFromDate] = useState(todayStr);
   const [toDate, setToDate] = useState(todayStr);
+  const [exporting, setExporting] = useState(false);
 
-  const handleExportCSV = () => {
-    const url = api.getReportExportUrl(fromDate, toDate);
-    window.location.href = url;
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const blob = await api.downloadReportCSV(fromDate, toDate);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_report_${fromDate}_to_${toDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || 'Failed to download report.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -61,9 +77,10 @@ export default function ReportsView() {
 
         <button
           onClick={handleExportCSV}
-          className="w-full py-3 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white rounded-2xl text-xs font-semibold shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 transition-all"
+          disabled={exporting}
+          className="w-full py-3 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white rounded-2xl text-xs font-semibold shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
         >
-          <Download className="w-4 h-4" /> Export Attendance CSV Report
+          <Download className="w-4 h-4" /> {exporting ? 'Generating Report...' : 'Export Attendance CSV Report'}
         </button>
       </div>
     </div>

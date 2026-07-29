@@ -48,9 +48,7 @@ export default function AttendanceDetailModal({ record, onClose, onCorrect, onUp
   const getFullImageUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http') || path.startsWith('data:')) return path;
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const serverOrigin = API_BASE.replace(/\/api\/?$/, '');
-    return `${serverOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
+    return path.startsWith('/') ? path : `/${path}`;
   };
 
   return (

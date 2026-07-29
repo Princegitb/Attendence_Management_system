@@ -6,6 +6,21 @@ const { logAuditEvent } = require('../utils/auditLogger');
 
 const TIMEZONE = process.env.SYSTEM_TIMEZONE || 'Asia/Kolkata';
 
+const getTimezoneOffsetString = (date = new Date()) => {
+  try {
+    const tzString = date.toLocaleString('en-US', { timeZone: TIMEZONE, timeZoneName: 'shortOffset' });
+    const match = tzString.match(/GMT([+-]\d{1,2})(?::(\d{2}))?/);
+    if (!match) return '+00:00';
+    const hours = match[1].replace('+', '');
+    const minutes = match[2] || '00';
+    const sign = match[1].startsWith('-') ? '-' : '+';
+    const paddedHours = String(Math.abs(parseInt(hours, 10))).padStart(2, '0');
+    return `${sign}${paddedHours}:${minutes}`;
+  } catch (e) {
+    return '+05:30';
+  }
+};
+
 const getLocalTimeDetails = (serverTimestamp = new Date()) => {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: TIMEZONE,
@@ -230,6 +245,21 @@ async function markCheckIn(req, res) {
 
     const guard = guardRes.rows[0];
 
+    // IDOR Check: verify officer is assigned to this guard or post today
+    const assignmentRes = await db.query(
+      `SELECT 1 FROM officer_assignments
+       WHERE officer_id = $1 AND (guard_id = $2 OR post_id = $3)
+         AND (from_date IS NULL OR from_date <= CURRENT_DATE)
+         AND (to_date IS NULL OR to_date >= CURRENT_DATE)`,
+      [officerId, guard.id, guard.post_id]
+    );
+    if (assignmentRes.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: You are not assigned to mark attendance for this guard or post today.'
+      });
+    }
+
     // 2. Compute Logical Shift Date
     const today = getLogicalShiftDate(guard, serverTimestamp);
 
@@ -389,6 +419,21 @@ async function markCheckOut(req, res) {
 
     const guard = guardRes.rows[0];
 
+    // IDOR Check: verify officer is assigned to this guard or post today
+    const assignmentRes = await db.query(
+      `SELECT 1 FROM officer_assignments
+       WHERE officer_id = $1 AND (guard_id = $2 OR post_id = $3)
+         AND (from_date IS NULL OR from_date <= CURRENT_DATE)
+         AND (to_date IS NULL OR to_date >= CURRENT_DATE)`,
+      [officerId, guard.id, guard.post_id]
+    );
+    if (assignmentRes.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: You are not assigned to mark attendance for this guard or post today.'
+      });
+    }
+
     // 2. Compute Logical Shift Date
     const today = getLogicalShiftDate(guard, serverTimestamp);
 
@@ -439,11 +484,13 @@ async function markCheckOut(req, res) {
     const [startH, startM, startS] = guard.start_time.split(':').map(Number);
     const [endH, endM, endS] = guard.end_time.split(':').map(Number);
 
+    const tzOffset = getTimezoneOffsetString(serverTimestamp);
+
     // Expected shift start is on the logical shift date
-    const expectedShiftStart = new Date(`${today}T${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:${String(startS || 0).padStart(2, '0')}+05:30`);
+    const expectedShiftStart = new Date(`${today}T${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:${String(startS || 0).padStart(2, '0')}${tzOffset}`);
     
     // Expected shift end
-    let expectedShiftEnd = new Date(`${today}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS || 0).padStart(2, '0')}+05:30`);
+    let expectedShiftEnd = new Date(`${today}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS || 0).padStart(2, '0')}${tzOffset}`);
     
     // If shift end time is less than start time, it's an overnight shift (ends on the next calendar day)
     const startTotalMin = startH * 60 + startM;
@@ -501,20 +548,21 @@ async function markCheckOut(req, res) {
 
     // 8. Auto-record overtime_records on late check-out (upsert on guard_id, date)
     if (otHours > 0) {
+      const otRecordStatus = newStatus === 'APPROVED' ? 'APPROVED' : 'PENDING';
       const otInsert = await db.query(
         `INSERT INTO overtime_records
            (guard_id, attendance_id, date, overtime_hours, status, approved_by,
             auto_generated, source, updated_at)
-         VALUES ($1, $2, $3, $4, 'APPROVED', NULL, TRUE, 'AUTO_LATE_CHECKOUT', NOW())
+         VALUES ($1, $2, $3, $4, $5, NULL, TRUE, 'AUTO_LATE_CHECKOUT', NOW())
          ON CONFLICT (guard_id, date) DO UPDATE
            SET overtime_hours  = EXCLUDED.overtime_hours,
                attendance_id   = EXCLUDED.attendance_id,
-               status          = 'APPROVED',
+               status          = EXCLUDED.status,
                auto_generated  = TRUE,
                source          = 'AUTO_LATE_CHECKOUT',
                updated_at      = NOW()
          RETURNING id`,
-        [guard.id, existingAtt.rows[0].id, today, otHours]
+        [guard.id, existingAtt.rows[0].id, today, otHours, otRecordStatus]
       );
       otRecordId = otInsert.rows[0].id;
     }

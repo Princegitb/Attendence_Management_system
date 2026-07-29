@@ -13,7 +13,7 @@ import ReportsView from './views/ReportsView';
 import AuditLogsView from './views/AuditLogsView';
 import PayrollConfigView from './views/PayrollConfigView';
 import PayrollGenerationView from './views/PayrollGenerationView';
-import { getCurrentUser, logout } from './services/api';
+import { getCurrentUser, logout, api } from './services/api';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -23,6 +23,18 @@ export default function App() {
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
+      // Verify session token on server
+      api.getMe()
+        .then(res => {
+          if (!res.success) {
+            handleLogout();
+          } else {
+            setUser(res.data);
+          }
+        })
+        .catch(() => {
+          handleLogout();
+        });
     }
   }, []);
 

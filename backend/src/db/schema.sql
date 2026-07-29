@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS managers (
     mobile VARCHAR(15) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'MANAGER',
+    token_version INT DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS field_officers (
     password_hash VARCHAR(255) NOT NULL,
     must_change_password BOOLEAN DEFAULT TRUE,
     status VARCHAR(20) DEFAULT 'ACTIVE',
+    token_version INT DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

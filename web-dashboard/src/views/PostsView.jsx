@@ -85,9 +85,15 @@ export default function PostsView() {
       return;
     }
 
+    const radius = parseInt(formData.allowed_radius_metres, 10);
+    if (isNaN(radius) || radius <= 0) {
+      setError('Allowed radius must be a positive number greater than 0.');
+      return;
+    }
+
     const payload = {
       ...formData,
-      allowed_radius_metres: parseInt(formData.allowed_radius_metres) || 100
+      allowed_radius_metres: radius
     };
 
     try {

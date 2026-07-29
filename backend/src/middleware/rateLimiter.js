@@ -20,7 +20,17 @@ const attendanceRateLimiter = rateLimit({
   skip: () => isDev, // Skip rate limiting in development mode
 });
 
+const refreshRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDev ? 1000 : 30, // Max 30 refreshes per 15 minutes
+  message: { success: false, message: 'Too many token refresh requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isDev,
+});
+
 module.exports = {
   loginRateLimiter,
-  attendanceRateLimiter
+  attendanceRateLimiter,
+  refreshRateLimiter
 };

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ClipboardCheck, Filter, Calendar, Eye, Edit3, Camera, MapPin, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
+import { getLocalDateString } from '../utils/date';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import ManualCorrectionModal from '../components/ManualCorrectionModal';
 import ConfirmActionModal from '../components/ConfirmActionModal';
@@ -33,7 +34,7 @@ const formatDuration = (totalMinutes) => {
 };
 
 export default function AttendanceView() {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [officerId, setOfficerId] = useState('');
   const [postId, setPostId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
