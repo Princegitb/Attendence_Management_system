@@ -1,11 +1,11 @@
 const express = require('express');
-const { protect, isManager } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const rosterController = require('../controllers/rosterController');
 
 const router = express.Router();
 
-router.get('/fulfillment', protect, isManager, rosterController.getFulfillmentStatus);
-router.get('/suggestions', protect, isManager, rosterController.getSuggestions);
-router.post('/apply-suggestions', protect, isManager, rosterController.applySuggestions);
+router.get('/fulfillment', authenticateToken, requireRole('MANAGER'), rosterController.getFulfillmentStatus);
+router.get('/suggestions', authenticateToken, requireRole('MANAGER'), rosterController.getSuggestions);
+router.post('/apply-suggestions', authenticateToken, requireRole('MANAGER'), rosterController.applySuggestions);
 
 module.exports = router;
