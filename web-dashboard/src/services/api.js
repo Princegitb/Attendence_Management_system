@@ -93,6 +93,9 @@ async function request(endpoint, options = {}, isRetry = false) {
 }
 
 export const api = {
+  // Session verification
+  getMe: () => request('/auth/me'),
+
   // Attendance
   getAttendance: (date, officerId, postId, status, shiftId) => {
     const params = new URLSearchParams();

@@ -176,10 +176,11 @@ export default function LocationPickerMap({
               type="number"
               step="any"
               value={currentPos.lat}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
                 setCurrentPos(prev => ({ ...prev, lat: val }));
-                onLocationSelect({ latitude: val, longitude: currentPos.lng });
+                if (!isNaN(val)) onLocationSelect({ latitude: val, longitude: currentPos.lng });
               }}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
             />
@@ -190,10 +191,11 @@ export default function LocationPickerMap({
               type="number"
               step="any"
               value={currentPos.lng}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
                 setCurrentPos(prev => ({ ...prev, lng: val }));
-                onLocationSelect({ latitude: currentPos.lat, longitude: val });
+                if (!isNaN(val)) onLocationSelect({ latitude: currentPos.lat, longitude: val });
               }}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
             />

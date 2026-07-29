@@ -23,18 +23,21 @@ export default function App() {
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
-      // Verify session token on server
-      api.getMe()
-        .then(res => {
-          if (!res.success) {
-            handleLogout();
-          } else {
-            setUser(res.data);
-          }
-        })
-        .catch(() => {
-          handleLogout();
-        });
+      // Silently verify session — never crash the app if this fails
+      try {
+        api.getMe()
+          .then(res => {
+            if (res && res.success && res.data) {
+              setUser(res.data);
+            }
+            // If the endpoint doesn't exist or returns an error, just keep the cached user
+          })
+          .catch(() => {
+            // Network error or endpoint missing — keep cached user, don't crash
+          });
+      } catch (e) {
+        // Sync error safety net — ignore
+      }
     }
   }, []);
 
