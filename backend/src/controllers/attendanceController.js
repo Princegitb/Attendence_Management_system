@@ -546,20 +546,21 @@ async function markCheckOut(req, res) {
       [serverTimestamp, latitude, longitude, uploadResult.url, newStatus, overtimeMinutes, existingAtt.rows[0].id]
     );
 
-    // 8. Auto-record overtime_records on late check-out (upsert on guard_id, date)
+    // 8. Route overtime to Manager queue (PENDING)
     if (otHours > 0) {
-      const otRecordStatus = newStatus === 'APPROVED' ? 'APPROVED' : 'PENDING';
+      // Always route overtime to the manager queue (strip auto-approve)
+      const otRecordStatus = 'PENDING'; 
       const otInsert = await db.query(
         `INSERT INTO overtime_records
            (guard_id, attendance_id, date, overtime_hours, status, approved_by,
             auto_generated, source, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NULL, TRUE, 'AUTO_LATE_CHECKOUT', NOW())
+         VALUES ($1, $2, $3, $4, $5, NULL, TRUE, 'LATE_CHECKOUT_PENDING', NOW())
          ON CONFLICT (guard_id, date) DO UPDATE
            SET overtime_hours  = EXCLUDED.overtime_hours,
                attendance_id   = EXCLUDED.attendance_id,
-               status          = EXCLUDED.status,
+               status          = 'PENDING',
                auto_generated  = TRUE,
-               source          = 'AUTO_LATE_CHECKOUT',
+               source          = 'LATE_CHECKOUT_PENDING',
                updated_at      = NOW()
          RETURNING id`,
         [guard.id, existingAtt.rows[0].id, today, otHours, otRecordStatus]
@@ -577,6 +578,27 @@ async function markCheckOut(req, res) {
     };
     const otLabel = formatOvertime(overtimeMinutes);
 
+    // Calculate worked minutes to check for Short Day
+    const checkInTimeObj = new Date(existingAtt.rows[0].check_in_time);
+    let workedMinutes = Math.floor((checkoutTimeObj - checkInTimeObj) / 60000);
+    if (workedMinutes < 0) workedMinutes = 0;
+    
+    const shiftDurationMinutes = (endTotalMin >= startTotalMin) 
+      ? endTotalMin - startTotalMin 
+      : (24 * 60 - startTotalMin) + endTotalMin;
+
+    if (workedMinutes < shiftDurationMinutes) {
+      const shortMins = shiftDurationMinutes - workedMinutes;
+      await logAuditEvent({
+        action: 'SHORT_DAY_LOGGED',
+        performedBy: 'SYSTEM',
+        performedByRole: 'SYSTEM',
+        targetType: 'Guard',
+        targetId: guard.id,
+        reason: `Short day detected: Guard ${guard.name} worked ${workedMinutes}m out of scheduled ${shiftDurationMinutes}m (short by ${shortMins}m).`
+      });
+    }
+
     await logAuditEvent({
       action: 'GUARD_CHECK_OUT',
       performedBy: req.user.name,
@@ -584,13 +606,13 @@ async function markCheckOut(req, res) {
       targetType: 'Guard',
       targetId: guard.id,
       reason: `Guard ${guard.name} checked out (${distanceMeters}m from post). Status: ${newStatus}` +
-              (overtimeMinutes > 0 ? `, Overtime: ${otLabel} (auto-approved)` : '')
+              (overtimeMinutes > 0 ? `, Overtime: ${otLabel} (Pending Manager Approval)` : '')
     });
 
     return res.json({
       success: true,
       message: overtimeMinutes > 0
-        ? `Check-out recorded for ${guard.name}. Overtime: ${otLabel} (auto-approved).`
+        ? `Check-out recorded for ${guard.name}. Overtime: ${otLabel} (pending approval).`
         : `Check-out recorded for ${guard.name} successfully.`,
       data: {
         attendanceId: updateRes.rows[0].id,
