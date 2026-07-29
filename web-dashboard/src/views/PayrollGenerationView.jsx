@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar as CalendarIcon, Users, DollarSign, Award, RefreshCw, Send, CheckCircle2, History, Eye, ChevronRight, X, Clock, MapPin, User } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, DollarSign, Award, RefreshCw, Send, CheckCircle2, History, Eye, ChevronRight, X, Clock, MapPin, User, Printer } from 'lucide-react';
 import { api } from '../services/api';
+import { generateGuardPayslipPDF } from '../utils/pdfGenerator';
 
 export default function PayrollGenerationView() {
   const currentYear = new Date().getFullYear();
@@ -455,20 +456,32 @@ export default function PayrollGenerationView() {
             ) : (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
-                  <div className="w-12 h-12 bg-sky-500/10 border border-sky-500/30 rounded-2xl flex items-center justify-center text-sky-400">
-                    <User className="w-6 h-6" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-sky-500/10 border border-sky-500/30 rounded-2xl flex items-center justify-center text-sky-400 shrink-0">
+                      <User className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        {slipData.guard.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 flex items-center gap-4 font-mono">
+                        <span>📱 {slipData.guard.mobile || 'N/A'}</span>
+                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {slipData.guard.post_name || 'No Post'}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {slipData.guard.shift_name || 'No Shift'}</span>
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      {slipData.guard.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 flex items-center gap-4 font-mono">
-                      <span>📱 {slipData.guard.mobile || 'N/A'}</span>
-                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {slipData.guard.post_name || 'No Post'}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {slipData.guard.shift_name || 'No Shift'}</span>
-                    </p>
-                  </div>
+
+                  <button
+                    onClick={() => {
+                      const monthLabel = monthsList.find(m => m.value === month)?.label || 'Payroll';
+                      generateGuardPayslipPDF(slipData, monthLabel, year);
+                    }}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all self-start sm:self-auto"
+                  >
+                    <Printer className="w-4 h-4" /> Download / Print PDF Payslip
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
