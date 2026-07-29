@@ -70,7 +70,7 @@ async function updateConfiguration(req, res) {
   }
 }
 
-async function bulkUpdatePayrollConfig(req, res) {
+async function bulkUpdateConfigurations(req, res) {
   const client = await db.getClient();
   try {
     const { salary_type, basic_salary, ot_rate_per_hour, is_ot_eligible } = req.body;
