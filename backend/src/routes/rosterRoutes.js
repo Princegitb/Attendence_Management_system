@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, isManager } = require('../middleware/authMiddleware');
+const { protect, isManager } = require('../middleware/auth');
 const rosterController = require('../controllers/rosterController');
 
 const router = express.Router();
