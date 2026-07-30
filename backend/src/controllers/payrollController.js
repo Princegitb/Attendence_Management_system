@@ -143,7 +143,7 @@ async function getGuardPayrollDetails(req, res) {
 
     // 1. Fetch Guard Info
     const guardRes = await db.query(
-      `SELECT g.id, g.name, g.mobile, p.name AS post_name, s.name AS shift_name
+      `SELECT g.id, g.name, g.mobile, p.name AS post_name, s.name AS shift_name, s.start_time, s.end_time
        FROM guards g
        LEFT JOIN posts p ON g.assigned_post_id = p.id
        LEFT JOIN shifts s ON g.assigned_shift_id = s.id
@@ -183,8 +183,49 @@ async function getGuardPayrollDetails(req, res) {
       [guard_id, startDateStr, endDateStr]
     );
 
-    const presentDays = attRes.rows.filter(a => ['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)).length;
-    const absentDays = daysInMonth - presentDays;
+    // Calculate effective present days using worked minutes
+    let shiftDurationMinutes = 480; // default 8 hours
+    if (guard.start_time && guard.end_time) {
+      const startParts = guard.start_time.split(':').map(Number);
+      const endParts = guard.end_time.split(':').map(Number);
+      const startMins = startParts[0] * 60 + startParts[1];
+      const endMins = endParts[0] * 60 + endParts[1];
+      if (endMins >= startMins) {
+         shiftDurationMinutes = endMins - startMins;
+      } else {
+         shiftDurationMinutes = (24 * 60 - startMins) + endMins;
+      }
+    }
+
+    let totalWorkedMinutes = 0;
+    for (const a of attRes.rows) {
+       if (!['APPROVED', 'CHECKED_IN', 'CHECKED_OUT'].includes(a.status)) continue;
+       
+       if (a.check_in_time && a.check_out_time) {
+          const checkIn = new Date(a.check_in_time);
+          const checkOut = new Date(a.check_out_time);
+          let mins = (checkOut - checkIn) / 60000;
+          if (mins < 0) mins = 0;
+          if (mins > shiftDurationMinutes) mins = shiftDurationMinutes;
+          totalWorkedMinutes += mins;
+       } else if (a.check_in_time && !a.check_out_time && a.status === 'CHECKED_IN') {
+          const checkIn = new Date(a.check_in_time);
+          let checkOut = new Date(checkIn.getTime() + shiftDurationMinutes * 60000);
+          
+          const now = new Date();
+          if (checkOut > now) checkOut = now;
+          
+          let mins = (checkOut - checkIn) / 60000;
+          if (mins < 0) mins = 0;
+          if (mins > shiftDurationMinutes) mins = shiftDurationMinutes;
+          totalWorkedMinutes += mins;
+       }
+    }
+    
+    let presentDays = totalWorkedMinutes / shiftDurationMinutes;
+    presentDays = Math.round(presentDays * 100) / 100; // 2 decimals
+    const absentDays = Math.max(0, Math.round((daysInMonth - presentDays) * 100) / 100);
+
     const approvedOtHours = otRes.rows.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + parseFloat(r.overtime_hours || 0), 0);
 
     const calculation = config ? calculateSalary({
