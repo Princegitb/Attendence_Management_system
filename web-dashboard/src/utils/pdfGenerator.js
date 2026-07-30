@@ -179,6 +179,21 @@ export function generateGuardPayslipPDF(slipData, monthName, year) {
             border-color: #fecaca;
             color: #b91c1c;
           }
+          .att-box.checkin {
+            background: #f0f9ff;
+            border-color: #bae6fd;
+            color: #0369a1;
+          }
+          .att-box.checkout {
+            background: #eef2ff;
+            border-color: #c7d2fe;
+            color: #4338ca;
+          }
+          .att-box.pending {
+            background: #fffbeb;
+            border-color: #fde68a;
+            color: #b45309;
+          }
           .att-day {
             font-size: 9px;
             font-weight: 700;
@@ -306,9 +321,18 @@ export function generateGuardPayslipPDF(slipData, monthName, year) {
                 cls = 'present';
                 label = 'P';
               }
-            } else if (['CHECKED_IN', 'CHECKED_OUT', 'PENDING'].includes(status)) {
-              cls = 'present';
-              label = 'P';
+            } else if (status === 'CHECKED_IN') {
+              cls = 'checkin';
+              label = 'CI';
+            } else if (status === 'CHECKED_OUT') {
+              cls = 'checkout';
+              label = 'CO';
+            } else if (status === 'PENDING') {
+              cls = 'pending';
+              label = 'PR';
+            } else if (status === 'REJECTED') {
+              cls = 'absent';
+              label = 'REJ';
             }
 
             return `
