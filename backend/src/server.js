@@ -8,6 +8,7 @@ dotenv.config();
 const initDb = require('./db/init');
 const seedDb = require('./db/seed');
 const { startMissedCheckoutCron } = require('./jobs/missedCheckoutJob');
+const { loginRateLimiter } = require('./middleware/rateLimiter');
 
 const authRoutes = require('./routes/authRoutes');
 const guardRoutes = require('./routes/guardRoutes');
@@ -29,15 +30,30 @@ app.set('trust proxy', 1);
 
 // Security & Parsing Middlewares
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : [
+      'http://localhost:5173', 
+      'http://localhost:3000', 
+      'https://attendence-management-system-psi.vercel.app'
+    ];
+
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // API Route Registration
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', loginRateLimiter, authRoutes);
 app.use('/api/guards', guardRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/shifts', shiftRoutes);
