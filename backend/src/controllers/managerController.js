@@ -16,7 +16,7 @@ const getLocalDateString = (dateObj = new Date()) => {
 async function getGuards(req, res) {
   try {
     const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 100;
+    const limit = parseInt(req.query.limit, 10) || 1000;
     const offset = (page - 1) * limit;
     const search = req.query.search ? `%${req.query.search.trim()}%` : null;
 
